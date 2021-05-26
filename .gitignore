@@ -401,8 +401,10 @@ tags
 
 ## WandB
 .netrc
+**/wandb/*
 
 ## Misk
 .pororo/*
+.npm
 
 ### User-specific ignore ###
