@@ -406,3 +406,4 @@ tags
 .pororo/*
 
 ### User-specific ignore ###
+code/wandb
