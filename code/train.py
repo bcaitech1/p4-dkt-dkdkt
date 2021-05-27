@@ -11,7 +11,8 @@ def main(args):
     setSeeds(42)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     args.device = device
-
+    args.fes = sorted(args.fes)
+    
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
     train_data = preprocess.get_train_data()

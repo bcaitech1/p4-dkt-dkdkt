@@ -7,6 +7,8 @@ import random
 from sklearn.preprocessing import LabelEncoder
 import numpy as np
 import torch
+from importlib import import_module
+from tqdm.auto import tqdm
 
 class Preprocess:
     def __init__(self,args):
@@ -45,9 +47,7 @@ class Preprocess:
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
             
-        for col in cate_cols:
-            
-            
+        for col in cate_cols:            
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -67,7 +67,7 @@ class Preprocess:
             
 
         def convert_time(s):
-            timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
+            timestamp = time.mktime(datetime.strptime(str(s), '%Y-%m-%d %H:%M:%S').timetuple())
             return int(timestamp)
 
         df['Timestamp'] = df['Timestamp'].apply(convert_time)
@@ -75,7 +75,12 @@ class Preprocess:
         return df
 
     def __feature_engineering(self, df):
-        #TODO
+        t = tqdm(self.args.fes, desc="feature engineering...")
+        for fe in t:
+            t.set_description(f"feature {fe} on going...")
+            new_feature = getattr(import_module(
+            "dkt.features"), fe) 
+            df = new_feature(df)
         return df
 
     def load_data_from_file(self, file_name, is_train=True):
@@ -91,19 +96,21 @@ class Preprocess:
         self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
         self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
         
+        df = df.sort_values(by=['userID','Timestamp'], axis=0) 
 
-
-        df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag']
+        columns = list(df.columns)
+        # if 'Timestamp' in columns: columns.remove('Timestamp')
         group = df[columns].groupby('userID').apply(
-                lambda r: (
-                    r['testId'].values, 
-                    r['assessmentItemID'].values,
-                    r['KnowledgeTag'].values,
-                    r['answerCode'].values
-                )
+                lambda r: (r[i].values for i in columns if i != 'userID' or i != 'Timestamp')
             )
-
+        # group = df[columns].groupby('userID').apply(
+        #     lambda r: (
+        #         r['testId'].values, 
+        #         r['assessmentItemID'].values,
+        #         r['KnowledgeTag'].values,
+        #         r['answerCode'].values
+        #     )
+        # )
         return group.values
 
     def load_train_data(self, file_name):
@@ -112,6 +119,14 @@ class Preprocess:
     def load_test_data(self, file_name):
         self.test_data = self.load_data_from_file(file_name, is_train= False)
 
+def set_column(r):
+    new_df = []
+    columns = list(r.columns)
+    if 'Timestamp' in columns: columns.remove('Timestamp')
+    if 'userID' in columns: columns.remove('userID')
+    for column in columns:
+        new_df.append(r[column].values)
+    return new_df
 
 class DKTDataset(torch.utils.data.Dataset):
     def __init__(self, data, args):

@@ -23,6 +23,8 @@ def parse_args(mode='train'):
     
     parser.add_argument('--max_seq_len', default=20, type=int, help='max sequence length')
     parser.add_argument('--num_workers', default=1, type=int, help='number of workers')
+    
+    parser.add_argument('--fes', default=[], nargs='+', help='names of feature engineerings.')
 
     # 모델
     parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension size')
