@@ -3,16 +3,15 @@ from args import parse_args
 from dkt.dataloader import Preprocess
 from dkt import trainer
 import torch
-from dkt.utils import setSeeds
+from dkt.utils import setSeeds, preprocess_arg
 import wandb
 def main(args):
     wandb.login()
+
+    preprocess_arg(args)
     
-    setSeeds(42)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    args.device = device
-    args.fes = sorted(args.fes)
-    
+    setSeeds(args.seed)
+
     preprocess = Preprocess(args)
     preprocess.load_train_data(args.file_name)
     train_data = preprocess.get_train_data()
@@ -25,5 +24,6 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args(mode='train')
+    print(f"train args : \n {args}")      
     os.makedirs(args.model_dir, exist_ok=True)
     main(args)

@@ -1,7 +1,7 @@
 import os
 import torch
 import numpy as np
-
+from tqdm.auto import tqdm
 
 from .dataloader import get_loaders
 from .optimizer import get_optimizer
@@ -9,6 +9,7 @@ from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
 from .model import LSTM
+
 
 import wandb
 
@@ -68,7 +69,7 @@ def train(train_loader, model, optimizer, args):
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in enumerate(train_loader):
+    for step, batch in tqdm(enumerate(train_loader)):
         input = process_batch(batch, args)
         preds = model(input)
         targets = input[3] # correct

@@ -75,12 +75,15 @@ class Preprocess:
         return df
 
     def __feature_engineering(self, df):
-        t = tqdm(self.args.fes, desc="feature engineering...")
-        for fe in t:
-            t.set_description(f"feature {fe} on going...")
-            new_feature = getattr(import_module(
-            "dkt.features"), fe) 
-            df = new_feature(df)
+        if self.args.fes == []:
+            print("----No FE Detected.----")
+        else:
+            t = tqdm(self.args.fes, desc="start feature engineering...")
+            for fe in t:
+                t.set_description(f"feature {fe} on going...")
+                new_feature = getattr(import_module(
+                "dkt.features"), fe) 
+                df = new_feature(df)
         return df
 
     def load_data_from_file(self, file_name, is_train=True):
@@ -99,18 +102,24 @@ class Preprocess:
         df = df.sort_values(by=['userID','Timestamp'], axis=0) 
 
         columns = list(df.columns)
-        # if 'Timestamp' in columns: columns.remove('Timestamp')
-        group = df[columns].groupby('userID').apply(
-                lambda r: (r[i].values for i in columns if i != 'userID' or i != 'Timestamp')
-            )
+        if 'Timestamp' in columns: columns.remove('Timestamp')
+        #----Not Implemented yet----
+
+        # print(columns)
         # group = df[columns].groupby('userID').apply(
-        #     lambda r: (
-        #         r['testId'].values, 
-        #         r['assessmentItemID'].values,
-        #         r['KnowledgeTag'].values,
-        #         r['answerCode'].values
+        #         lambda r: (r[i].values for i in columns if i != 'userID' or i != 'Timestamp')
         #     )
-        # )
+        
+        # group = df[columns].groupby('userID').apply(set_column
+        #     )
+        group = df[columns].groupby('userID').apply(
+            lambda r: (
+                r['testId'].values, 
+                r['assessmentItemID'].values,
+                r['KnowledgeTag'].values,
+                r['answerCode'].values
+            )
+        )
         return group.values
 
     def load_train_data(self, file_name):

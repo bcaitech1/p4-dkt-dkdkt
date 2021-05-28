@@ -1,14 +1,18 @@
 import os
 import argparse
-
+from typing import Optional
 
 def parse_args(mode='train'):
     parser = argparse.ArgumentParser()
+    # custom args
+    parser.add_argument('--json', nargs='?', const='latest', type=str, help='get argument form json file. (default: get lastets file from config/train)' )
+    parser.add_argument('--fes', default=[], nargs='+', help='names of FE funcs.')
+    parser.add_argument('--exp_cfg', nargs='?', const='./config/train/export/', type=str, help='Directory to export config.')
+       
 
-    
     parser.add_argument('--seed', default=42, type=int, help='seed')
     
-    parser.add_argument('--device', default='cpu', type=str, help='cpu or gpu')
+    parser.add_argument('--device', default='gpu', type=str, help='cpu or gpu')
 
     parser.add_argument('--data_dir', default='/opt/ml/input/data/train_dataset', type=str, help='data directory')
     parser.add_argument('--asset_dir', default='asset/', type=str, help='data directory')
@@ -24,8 +28,6 @@ def parse_args(mode='train'):
     parser.add_argument('--max_seq_len', default=20, type=int, help='max sequence length')
     parser.add_argument('--num_workers', default=1, type=int, help='number of workers')
     
-    parser.add_argument('--fes', default=[], nargs='+', help='names of feature engineerings.')
-
     # 모델
     parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension size')
     parser.add_argument('--n_layers', default=2, type=int, help='number of layers')
