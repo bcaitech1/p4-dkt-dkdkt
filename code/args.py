@@ -7,8 +7,9 @@ def parse_args(mode='train'):
     # custom args
     parser.add_argument('--json', nargs='?', const='latest', type=str, help='get argument form json file. (default: get lastets file from config/train)' )
     parser.add_argument('--fes', default=[], nargs='+', help='names of FE funcs.')
-    parser.add_argument('--exp_cfg', nargs='?', const='./config/train/export/', type=str, help='Directory to export config.')
-       
+    parser.add_argument('--exp_cfg', nargs='?', const='./config/train/export/exported_config.json', type=str, help='Directory and name of exported config.')
+    parser.add_argument('--no_select', nargs='?', const=True, type=bool, help='Select config json from directory given at "json" argument. (default: False)' )
+
 
     parser.add_argument('--seed', default=42, type=int, help='seed')
     
