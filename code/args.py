@@ -4,9 +4,11 @@ from typing import Optional
 
 def parse_args(mode='train'):
     parser = argparse.ArgumentParser()
-    # custom args
-    parser.add_argument('--json', nargs='?', const='latest', type=str, help='get argument form json file. (default: get lastets file from config/train)' )
+    # custom Feature engineerings
     parser.add_argument('--fes', default=[], nargs='+', help='names of FE funcs.')
+    
+    # custom config input output
+    parser.add_argument('--json', nargs='?', const='latest', type=str, help='get argument form json file. (default: get lastets file from config/train)' )
     parser.add_argument('--exp_cfg', nargs='?', const='./config/train/export/exported_config.json', type=str, help='Directory and name of exported config.')
     parser.add_argument('--no_select', nargs='?', const=True, type=bool, help='Select config json from directory given at "json" argument. (default: False)' )
 

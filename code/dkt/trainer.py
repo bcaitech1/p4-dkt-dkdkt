@@ -26,7 +26,7 @@ def run(args, train_data, valid_data):
 
     best_auc = -1
     early_stopping_counter = 0
-    for epoch in range(args.n_epochs):
+    for epoch in tqdm(range(args.n_epochs)):
 
         print(f"Start Training: Epoch {epoch + 1}")
         
@@ -69,7 +69,7 @@ def train(train_loader, model, optimizer, args):
     total_preds = []
     total_targets = []
     losses = []
-    for step, batch in tqdm(enumerate(train_loader)):
+    for step, batch in enumerate(train_loader):
         input = process_batch(batch, args)
         preds = model(input)
         targets = input[3] # correct

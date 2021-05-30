@@ -1,6 +1,4 @@
 import os
-from datetime import datetime
-import time
 import tqdm
 import pandas as pd
 import random
@@ -9,6 +7,7 @@ import numpy as np
 import torch
 from importlib import import_module
 from tqdm.auto import tqdm
+from utils import convert_time
 
 class Preprocess:
     def __init__(self,args):
@@ -34,20 +33,19 @@ class Preprocess:
         size = int(len(data) * ratio)
         data_1 = data[:size]
         data_2 = data[size:]
-
         return data_1, data_2
 
     def __save_labels(self, encoder, name):
         le_path = os.path.join(self.args.asset_dir, name + '_classes.npy')
         np.save(le_path, encoder.classes_)
 
-    def __preprocessing(self, df, is_train = True):
-        cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
+
+    def __preprocessing(self, df, cate_cols, is_train = True):
 
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
             
-        for col in cate_cols:            
+        for col in tqdm(cate_cols, desc="preprocessing data..."):            
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -64,62 +62,57 @@ class Preprocess:
             df[col]= df[col].astype(str)
             test = le.transform(df[col])
             df[col] = test
-            
 
-        def convert_time(s):
-            timestamp = time.mktime(datetime.strptime(str(s), '%Y-%m-%d %H:%M:%S').timetuple())
-            return int(timestamp)
-
-        df['Timestamp'] = df['Timestamp'].apply(convert_time)
+        if 'Timestamp' in df.columns:
+            df['Timestamp'] = df['Timestamp'].apply(convert_time)
         
-        return df
+        return df, cate_cols
 
-    def __feature_engineering(self, df):
+    def __feature_engineering(self, df):        
+        cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
         if self.args.fes == []:
             print("----No FE Detected.----")
         else:
+            fes = []
             t = tqdm(self.args.fes, desc="start feature engineering...")
             for fe in t:
-                t.set_description(f"feature {fe} on going...")
+                t.set_description(f"feature {fe} processing...")
                 new_feature = getattr(import_module(
-                "dkt.features"), fe) 
-                df = new_feature(df)
-        return df
+                f"features.{fe}"), fe) 
+                fes += new_feature(df)
+            
+            for fe in fes:
+                if fe['job'] == "del":
+                    df = df.drop(columns=fe['column_names'])
+                    for name in fe['column_names']:
+                        if name in cate_cols:
+                            cate_cols.remove(name)
+                else :
+                    for idx, name in enumerate(fe['column_names']):
+                        df[name] = fe['column'][idx]
+                        if fe['job'] == "add_cat":
+                            cate_cols.append(name)                            
+                    
+        return df, cate_cols
 
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
         df = pd.read_csv(csv_file_path)#, nrows=100000)
-        df = self.__feature_engineering(df)
-        df = self.__preprocessing(df, is_train)
+        df, cate_cols = self.__feature_engineering(df)
+        df, cate_cols = self.__preprocessing(df, cate_cols, is_train)
 
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
-
-                
-        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
-        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
-        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
+        self.args.n_cols = []
+        for cate_col in cate_cols:
+            self.args.n_cols.append(len(np.load(os.path.join(self.args.asset_dir,f'{cate_col}_classes.npy'))))
         
         df = df.sort_values(by=['userID','Timestamp'], axis=0) 
 
         columns = list(df.columns)
         if 'Timestamp' in columns: columns.remove('Timestamp')
-        #----Not Implemented yet----
+        if 'userID' in columns: columns.remove('userID')
 
-        # print(columns)
-        # group = df[columns].groupby('userID').apply(
-        #         lambda r: (r[i].values for i in columns if i != 'userID' or i != 'Timestamp')
-        #     )
-        
-        # group = df[columns].groupby('userID').apply(set_column
-        #     )
-        group = df[columns].groupby('userID').apply(
-            lambda r: (
-                r['testId'].values, 
-                r['assessmentItemID'].values,
-                r['KnowledgeTag'].values,
-                r['answerCode'].values
-            )
-        )
+        group = df[columns].groupby('userID').apply(set_column)
         return group.values
 
     def load_train_data(self, file_name):

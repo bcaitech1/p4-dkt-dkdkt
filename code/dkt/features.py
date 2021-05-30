@@ -3,10 +3,8 @@ import pandas as pd
 '''
 suffix of preprocessing
 - a: add row
-- b: change sequence
 - c: add colmun
 - d: change column
-- e: delete column
 '''
 
 def get_cache(colmun_name:str, data_dir='/opt/ml/input/data/train_dataset/features/', parse_dates=False, dtype=None):    
