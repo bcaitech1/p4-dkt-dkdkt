@@ -6,6 +6,8 @@ def parse_args(mode='train'):
     parser = argparse.ArgumentParser()
     # custom Feature engineerings
     parser.add_argument('--fes', default=[], nargs='+', help='names of FE funcs.')
+    parser.add_argument('--no_fe_cache', nargs='?', const=True, type=bool, help='dont use caching during FE.(default: False)' )
+
     
     # custom config input output
     parser.add_argument('--json', nargs='?', const='latest', type=str, help='get argument form json file. (default: get lastets file from config/train)' )
@@ -30,6 +32,7 @@ def parse_args(mode='train'):
     
     parser.add_argument('--max_seq_len', default=20, type=int, help='max sequence length')
     parser.add_argument('--num_workers', default=1, type=int, help='number of workers')
+    parser.add_argument('--pin_mem', default=True, type=bool, help='using pin memory in dataloader(default:True)')
     
     # 모델
     parser.add_argument('--hidden_dim', default=64, type=int, help='hidden dimension size')

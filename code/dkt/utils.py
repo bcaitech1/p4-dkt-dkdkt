@@ -1,7 +1,5 @@
 import os, random, torch
 import numpy as np
-from datetime import datetime
-import time
 import argparse
 import json
 import glob
@@ -71,9 +69,6 @@ def select_file_from_dir(init_dir, target_type=None):
             print("***************************************************")
 
 
-def convert_time(s):
-    timestamp = time.mktime(datetime.strptime(str(s), '%Y-%m-%d %H:%M:%S').timetuple())
-    return int(timestamp)
 
 
 def check_wandb_json(config)->bool:

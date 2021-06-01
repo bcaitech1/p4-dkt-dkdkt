@@ -1,4 +1,7 @@
+from genericpath import exists
 import os
+from typing import Dict
+from pandas.core.frame import DataFrame
 import tqdm
 import pandas as pd
 import random
@@ -7,13 +10,17 @@ import numpy as np
 import torch
 from importlib import import_module
 from tqdm.auto import tqdm
-from utils import convert_time
+# from dkt.utils import convert_time
+
+from datetime import datetime
+import time
 
 class Preprocess:
     def __init__(self,args):
         self.args = args
         self.train_data = None
         self.test_data = None
+        self.valid_data = None
         
 
     def get_train_data(self):
@@ -21,6 +28,9 @@ class Preprocess:
 
     def get_test_data(self):
         return self.test_data
+        
+    def get_valid_data(self):
+        return self.valid_data
 
     def split_data(self, data, ratio=0.7, shuffle=True, seed=0):
         """
@@ -40,12 +50,21 @@ class Preprocess:
         np.save(le_path, encoder.classes_)
 
 
-    def __preprocessing(self, df, cate_cols, is_train = True):
+    def __preprocessing(self, df, is_train = True):
 
-        if not os.path.exists(self.args.asset_dir):
-            os.makedirs(self.args.asset_dir)
-            
-        for col in tqdm(cate_cols, desc="preprocessing data..."):            
+        os.makedirs(self.args.asset_dir,exist_ok=True)
+        if 'KnowledgeTag' in df.columns:
+            df['KnowledgeTag'] = df['KnowledgeTag'].astype(str)
+        self.args.non_cate_cols = [] # column for continuous feature.
+        cate_cols = []
+        for col in df.columns:
+            if col != "userID" and col != "Timestamp" and col != "answerCode":
+                if df[col].dtype == object:
+                    cate_cols.append(col)
+                else:
+                    self.args.non_cate_cols.append(col)
+
+        for col in tqdm(cate_cols, desc="preprocessing categorical data..."):            
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -62,55 +81,57 @@ class Preprocess:
             df[col]= df[col].astype(str)
             test = le.transform(df[col])
             df[col] = test
-
-        if 'Timestamp' in df.columns:
-            df['Timestamp'] = df['Timestamp'].apply(convert_time)
         
+        def convert_time(s):
+            timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
+            return int(timestamp)
+  
+        print("Convert Timestamp...")
+        df['Timestamp'] = df['Timestamp'].apply(convert_time)        
+        print("--preprocessing done--")
+
         return df, cate_cols
 
     def __feature_engineering(self, df):        
-        cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
+        # cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
         if self.args.fes == []:
             print("----No FE Detected.----")
         else:
             fes = []
+            # df = df.drop(columns=['Unnamed: 0'], errors='ignore')
             t = tqdm(self.args.fes, desc="start feature engineering...")
             for fe in t:
                 t.set_description(f"feature {fe} processing...")
-                new_feature = getattr(import_module(
-                f"features.{fe}"), fe) 
-                fes += new_feature(df)
+                new_feature:function = getattr(import_module(
+                f"features.{fe}"), 'run') 
+                fes += new_feature(df, not self.args.no_fe_cache)
             
             for fe in fes:
                 if fe['job'] == "del":
-                    df = df.drop(columns=fe['column_names'])
-                    for name in fe['column_names']:
-                        if name in cate_cols:
-                            cate_cols.remove(name)
+                    df = df.drop(columns=fe['columns'], errors='ignore')
                 else :
-                    for idx, name in enumerate(fe['column_names']):
-                        df[name] = fe['column'][idx]
-                        if fe['job'] == "add_cat":
-                            cate_cols.append(name)                            
-                    
-        return df, cate_cols
+                    for series in fe['columns']:
+                        if series.name in df.columns: raise KeyError(f"{series.name} column already exist.")
+                        df[series.name] = series
+        return df
 
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_csv(csv_file_path)#, nrows=100000)
-        df, cate_cols = self.__feature_engineering(df)
-        df, cate_cols = self.__preprocessing(df, cate_cols, is_train)
-
+        df = pd.read_csv(csv_file_path)
+        df = self.__feature_engineering(df)
+        df, cate_cols = self.__preprocessing(df, is_train)
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
-        self.args.n_cols = []
-        for cate_col in cate_cols:
-            self.args.n_cols.append(len(np.load(os.path.join(self.args.asset_dir,f'{cate_col}_classes.npy'))))
-        
-        df = df.sort_values(by=['userID','Timestamp'], axis=0) 
+        self.args.cate_cols = {} # arg for categorical columns and index num.
+        for col in cate_cols:
+            self.args.cate_cols[col] = (len(np.load(os.path.join(self.args.asset_dir,f'{col}_classes.npy'))))
 
         columns = list(df.columns)
-        if 'Timestamp' in columns: columns.remove('Timestamp')
-        if 'userID' in columns: columns.remove('userID')
+        if 'Timestamp' in columns: columns.remove('Timestamp')       
+        self.args.columns = [i for i in columns] # arg for column sequence info.
+        if 'userID' in columns: self.args.columns.remove('userID')
+
+        df = df.sort_values(by=['userID','Timestamp'], axis=0)
+        self.args.columns.append('mask')
 
         group = df[columns].groupby('userID').apply(set_column)
         return group.values
@@ -120,6 +141,9 @@ class Preprocess:
 
     def load_test_data(self, file_name):
         self.test_data = self.load_data_from_file(file_name, is_train= False)
+
+    def load_valid_data(self, file_name):
+        self.valid_data = self.load_data_from_file(file_name, is_train= False)
 
 def set_column(r):
     new_df = []
@@ -139,30 +163,29 @@ class DKTDataset(torch.utils.data.Dataset):
         row = self.data[index]
 
         # 각 data의 sequence length
-        seq_len = len(row[0])
-
-        test, question, tag, correct = row[0], row[1], row[2], row[3]
+        seq_len = len(row[0])        
         
-
-        cate_cols = [test, question, tag, correct]
+        # test, question, tag, correct = row[0], row[1], row[2], row[3]
+        
+        # need to refactoring!
+        cols = [row[i] for i, col_name in enumerate(self.args.columns) if col_name != 'mask']
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:
-            for i, col in enumerate(cate_cols):
-                cate_cols[i] = col[-self.args.max_seq_len:]
+            for i, col in enumerate(cols):
+                cols[i] = col[-self.args.max_seq_len:]
             mask = np.ones(self.args.max_seq_len, dtype=np.int16)
         else:
             mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
             mask[-seq_len:] = 1
 
         # mask도 columns 목록에 포함시킴
-        cate_cols.append(mask)
-
+        cols.append(mask)
         # np.array -> torch.tensor 형변환
-        for i, col in enumerate(cate_cols):
-            cate_cols[i] = torch.tensor(col)
+        for i, col in enumerate(cols):
+            cols[i] = torch.tensor(col)
 
-        return cate_cols
+        return cols
 
     def __len__(self):
         return len(self.data)
@@ -192,7 +215,7 @@ def collate(batch):
 
 def get_loaders(args, train, valid):
 
-    pin_memory = False
+    pin_memory = args.pin_mem
     train_loader, valid_loader = None, None
     
     if train is not None:
