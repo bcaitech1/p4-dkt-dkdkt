@@ -49,22 +49,15 @@ class Preprocess:
 
 
     def __preprocessing(self, df, is_train = True):
+        cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
 
-        os.makedirs(self.args.asset_dir,exist_ok=True)
-        if 'KnowledgeTag' in df.columns: df['KnowledgeTag'] = df['KnowledgeTag'].astype(str)
-        self.args.non_cate_cols = [] # column for continuous feature.
-        cate_cols = []
-        for col in df.columns:
-            if col != "userID" and col != "Timestamp" and col != "answerCode":
-                if df[col].dtype == object:
-                    cate_cols.append(col)
-                else:
-                    self.args.non_cate_cols.append(col)
-
-        for col in tqdm(cate_cols, desc="preprocessing categorical data..."):            
+        if not os.path.exists(self.args.asset_dir):
+            os.makedirs(self.args.asset_dir)
+            
+        for col in cate_cols:
             le = LabelEncoder()
             if is_train:
-                #For UNKNOWN class
+                #Add unknown class For UNKNOWN data.
                 a = df[col].unique().tolist() + ['unknown']
                 le.fit(a)
                 self.__save_labels(le, col)
@@ -78,55 +71,43 @@ class Preprocess:
             df[col]= df[col].astype(str)
             test = le.transform(df[col])
             df[col] = test
-         
-        print("Convert Timestamp...")
+                    
+        print("preprocessing start")
         df['Timestamp'] = df['Timestamp'].apply(convert_time)        
-        print("--preprocessing done--")
+        print("preprocessing done")
+        
+        return df
 
-        return df, cate_cols
-
-    def __feature_engineering(self, df):        
-        # cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
-        if self.args.fes == []:
-            print("----No FE Detected.----")
-        else:
-            fes = []
-            # df = df.drop(columns=['Unnamed: 0'], errors='ignore')
-            t = tqdm(self.args.fes, desc="start feature engineering...")
-            for fe in t:
-                t.set_description(f"feature {fe} processing...")
-                new_feature:function = getattr(import_module(
-                f"features.{fe}"), 'run') 
-                fes += new_feature(df, not self.args.no_fe_cache)
-            
-            for fe in fes:
-                if fe['job'] == "del":
-                    df = df.drop(columns=fe['columns'], errors='ignore')
-                else :
-                    for series in fe['columns']:
-                        if series.name in df.columns: raise KeyError(f"{series.name} column already exist.")
-                        df[series.name] = series
+    def __feature_engineering(self, df):
+        # TODO: add new feature from DataFrame form train data.
         return df
 
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_csv(csv_file_path, nrows=1000)
+        df = pd.read_csv(csv_file_path, nrows=100000)
         df = self.__feature_engineering(df)
-        df, cate_cols = self.__preprocessing(df, is_train)
-        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
-        self.args.cate_cols = {} # arg for categorical columns and index num.
-        for col in cate_cols:
-            self.args.cate_cols[col] = (len(np.load(os.path.join(self.args.asset_dir,f'{col}_classes.npy'))))
+        df = self.__preprocessing(df, is_train)
 
-        columns = list(df.columns)
-        if 'Timestamp' in columns: columns.remove('Timestamp')       
-        self.args.columns = [i for i in columns] # arg for column sequence info.
-        if 'userID' in columns: self.args.columns.remove('userID')
+        # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
+
+                
+        self.args.n_questions = len(np.load(os.path.join(self.args.asset_dir,'assessmentItemID_classes.npy')))
+        self.args.n_test = len(np.load(os.path.join(self.args.asset_dir,'testId_classes.npy')))
+        self.args.n_tag = len(np.load(os.path.join(self.args.asset_dir,'KnowledgeTag_classes.npy')))
+        
+
 
         df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        self.args.columns.append('mask')
+        columns = ['userID', 'assessmentItemID', 'testId', 'answerCode', 'KnowledgeTag']
+        group = df[columns].groupby('userID').apply(
+                lambda r: (
+                    r['testId'].values, 
+                    r['assessmentItemID'].values,
+                    r['KnowledgeTag'].values,
+                    r['answerCode'].values
+                )
+            )
 
-        group = df[columns].groupby('userID').apply(set_column)
         return group.values
 
     def load_train_data(self, file_name):
@@ -156,29 +137,30 @@ class DKTDataset(torch.utils.data.Dataset):
         row = self.data[index]
 
         # 각 data의 sequence length
-        seq_len = len(row[0])        
+        seq_len = len(row[0])
+
+        test, question, tag, correct = row[0], row[1], row[2], row[3]
         
-        # test, question, tag, correct = row[0], row[1], row[2], row[3]
-        
-        # need to refactoring!
-        cols = [row[i] for i, col_name in enumerate(self.args.columns) if col_name != 'mask']
+
+        cate_cols = [test, question, tag, correct]
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:
-            for i, col in enumerate(cols):
-                cols[i] = col[-self.args.max_seq_len:]
+            for i, col in enumerate(cate_cols):
+                cate_cols[i] = col[-self.args.max_seq_len:]
             mask = np.ones(self.args.max_seq_len, dtype=np.int16)
         else:
             mask = np.zeros(self.args.max_seq_len, dtype=np.int16)
             mask[-seq_len:] = 1
 
         # mask도 columns 목록에 포함시킴
-        cols.append(mask)
-        # np.array -> torch.tensor 형변환
-        for i, col in enumerate(cols):
-            cols[i] = torch.tensor(col)
+        cate_cols.append(mask)
 
-        return cols
+        # np.array -> torch.tensor 형변환
+        for i, col in enumerate(cate_cols):
+            cate_cols[i] = torch.tensor(col)
+
+        return cate_cols
 
     def __len__(self):
         return len(self.data)

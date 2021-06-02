@@ -87,7 +87,7 @@ def train(train_loader, model, optimizer, args):
     for step, batch in enumerate(train_loader):
         input = process_batch(batch, args)
         preds = model(input).to(args.device)
-        targets = input['answerCode']  # answerCode
+        targets = input[3] # correct
 
         loss = compute_loss(preds, targets)
         update_params(loss, model, optimizer, args)
@@ -96,10 +96,10 @@ def train(train_loader, model, optimizer, args):
             print(f"Training steps: {step} Loss: {str(loss.item())}")
 
         # predictions
-        # preds = preds[:,-1]
-        # targets = targets[:,-1]
-        preds = preds[-1, :]
-        targets = targets[-1, :]
+        preds = preds[:,-1]
+        targets = targets[:,-1]
+        # preds = preds[-1, :]
+        # targets = targets[-1, :]
 
         if args.device == 'cuda':
             # tensor를 numpy화할 때, gpu에서 진행불가, cpu로 넘겨야 함.
@@ -132,13 +132,13 @@ def validate(valid_loader, model, args):
         input = process_batch(batch, args)
 
         preds = model(input)
-        targets = input['answerCode']  # answerCode
+        targets = input[3] # correct
 
         # predictions
-        # preds = preds[:,-1]
-        # targets = targets[:,-1]
-        preds = preds[-1, :]
-        targets = targets[-1, :]
+        preds = preds[:,-1]
+        targets = targets[:,-1]
+        # preds = preds[-1, :]
+        # targets = targets[-1, :]
 
         if args.device == 'cuda':
             preds = preds.to('cpu').detach().numpy()
@@ -175,8 +175,8 @@ def inference(args, test_data):
         preds = model(input)
 
         # predictions
-        # preds = preds[:,-1]
-        preds = preds[-1, :]
+        preds = preds[:,-1]
+        # preds = preds[-1, :]
 
         if args.device == 'cuda':
             preds = preds.to('cpu').detach().numpy()
@@ -214,46 +214,50 @@ def get_model(args):
 # 배치 전처리
 def process_batch(batch, args):
 
-    # test, question, tag, correct, mask = batch
-    batch_dict = {args.columns[i]: col for i, col in enumerate(batch)}
-
+    test, question, tag, correct, mask = batch
+    
+    
     # change to float
-    batch_dict['mask'] = batch_dict['mask'].type(torch.FloatTensor)
-    batch_dict['answerCode'] = batch_dict['answerCode'].type(torch.FloatTensor)
+    mask = mask.type(torch.FloatTensor)
+    correct = correct.type(torch.FloatTensor)
 
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
-    interaction = batch_dict['answerCode'] + 1  # 패딩을 위해 correct값에 1을 더해준다.
+    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
-    interaction_mask = batch_dict['mask'].roll(shifts=1, dims=1)
+    interaction_mask = mask.roll(shifts=1, dims=1)
     interaction_mask[:, 0] = 0
     # interaction[:, 0] = 0 # set padding index to the first sequence
-    # interaction = (interaction *  batch_dict['mask']).to(torch.int64)
     interaction = (interaction * interaction_mask).to(torch.int64)
     # print(interaction)
     # exit()
     #  test_id, question_id, tag
-    for col_name in batch_dict.keys():
-        if col_name != "mask" and col_name != "answerCode":
-            if col_name in args.non_cate_cols:
-                batch_dict[col_name] = (
-                    (batch_dict[col_name]) * batch_dict['mask']).to(batch_dict[col_name].dtype)
-            else:
-                batch_dict[col_name] = (
-                    (batch_dict[col_name] + 1) * batch_dict['mask']).to(torch.int64)
+    test = ((test + 1) * mask).to(torch.int64)
+    question = ((question + 1) * mask).to(torch.int64)
+    tag = ((tag + 1) * mask).to(torch.int64)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
-    gather_index = torch.tensor(np.count_nonzero(batch_dict['mask'], axis=1))
+    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
     gather_index = gather_index.view(-1, 1) - 1
 
-    # device memory로 이동
-    for col_name in batch_dict.keys():
-        batch_dict[col_name] = batch_dict[col_name].to(args.device)
-    batch_dict['interaction'] = interaction.to(args.device)
-    batch_dict['gather_index'] = gather_index.to(args.device)
 
-    return batch_dict
+    # device memory로 이동
+
+    test = test.to(args.device)
+    question = question.to(args.device)
+
+
+    tag = tag.to(args.device)
+    correct = correct.to(args.device)
+    mask = mask.to(args.device)
+
+    interaction = interaction.to(args.device)
+    gather_index = gather_index.to(args.device)
+
+    return (test, question,
+            tag, correct, mask,
+            interaction, gather_index)
 
 
 # loss계산하고 parameter update!
