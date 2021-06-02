@@ -48,6 +48,7 @@ def run(args, train_data, valid_data):
                   "valid_auc": auc, "valid_acc": acc}
         # TODO: model save or early stopping
         wandb.log(result)
+        
         result["train_loss"] = train_loss.item()
         log_json[epoch] = tensor_dict_to_str(result)
         with open(f'{save_dir}/log.json','w') as f:
