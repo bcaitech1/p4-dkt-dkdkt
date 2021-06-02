@@ -1,0 +1,130 @@
+{
+  "lr": {
+    "desc": null,
+    "value": 0.0001
+  },
+  "fes": {
+    "desc": null,
+    "value": []
+  },
+  "json": {
+    "desc": null,
+    "value": null
+  },
+  "seed": {
+    "desc": null,
+    "value": 42
+  },
+  "model": {
+    "desc": null,
+    "value": "lstm"
+  },
+  "device": {
+    "desc": null,
+    "value": "cuda"
+  },
+  "exp_cfg": {
+    "desc": null,
+    "value": "./config/train/export/exported_config.json"
+  },
+  "n_heads": {
+    "desc": null,
+    "value": 2
+  },
+  "pin_mem": {
+    "desc": null,
+    "value": true
+  },
+  "data_dir": {
+    "desc": null,
+    "value": "/opt/ml/input/data/train_dataset"
+  },
+  "drop_out": {
+    "desc": null,
+    "value": 0.2
+  },
+  "n_epochs": {
+    "desc": null,
+    "value": 20
+  },
+  "n_layers": {
+    "desc": null,
+    "value": 2
+  },
+  "patience": {
+    "desc": null,
+    "value": 5
+  },
+  "val_name": {
+    "desc": null,
+    "value": null
+  },
+  "asset_dir": {
+    "desc": null,
+    "value": "asset/"
+  },
+  "clip_grad": {
+    "desc": null,
+    "value": 10
+  },
+  "file_name": {
+    "desc": null,
+    "value": "cv_train_data.csv"
+  },
+  "log_steps": {
+    "desc": null,
+    "value": 50
+  },
+  "model_dir": {
+    "desc": null,
+    "value": "models/"
+  },
+  "no_select": {
+    "desc": null,
+    "value": null
+  },
+  "optimizer": {
+    "desc": null,
+    "value": "adam"
+  },
+  "scheduler": {
+    "desc": null,
+    "value": "plateau"
+  },
+  "batch_size": {
+    "desc": null,
+    "value": 64
+  },
+  "hidden_dim": {
+    "desc": null,
+    "value": 64
+  },
+  "k_fold_idx": {
+    "desc": null,
+    "value": 0
+  },
+  "model_name": {
+    "desc": null,
+    "value": "model.pt"
+  },
+  "output_dir": {
+    "desc": null,
+    "value": "output/"
+  },
+  "max_seq_len": {
+    "desc": null,
+    "value": 20
+  },
+  "no_fe_cache": {
+    "desc": null,
+    "value": null
+  },
+  "num_workers": {
+    "desc": null,
+    "value": 1
+  },
+  "test_file_name": {
+    "desc": null,
+    "value": "test_data.csv"
+  }
+}

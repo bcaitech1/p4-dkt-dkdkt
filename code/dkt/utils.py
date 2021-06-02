@@ -190,6 +190,7 @@ def preprocess_arg(args:argparse.Namespace):
     # Get config from json:
     if not args.no_select:
         # for json select mode
+        
         target_dir = './config/train/' if not hasattr(args, 'json') or args.json != 'lastest' else args.json 
         os.makedirs(target_dir, exist_ok=True)
         selected = select_file_from_dir(target_dir, 'json')
@@ -199,7 +200,6 @@ def preprocess_arg(args:argparse.Namespace):
         if args.json == "latest": 
             args.json = get_latest_modified_file()
         args = import_config_from_json(args.json) 
-
     args_list = []
     for args in batch_json_processing(args):
         # Change device based on server system.

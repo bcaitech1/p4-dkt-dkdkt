@@ -10,7 +10,8 @@ def main(args):
     wandb.login()
 
     args_list = preprocess_arg(args)
-    for i, args in enumerate(args_list):
+    for i, args in enumerate(args_list):        
+        print(f"train args : \n {args}")      
         print(f'start {i} json config')
         args.k_fold_idx = 0
         setSeeds(args.seed)
@@ -30,6 +31,5 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args(mode='train')
-    print(f"train args : \n {args}")      
     os.makedirs(args.model_dir, exist_ok=True)
     main(args)

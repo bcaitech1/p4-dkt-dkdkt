@@ -15,7 +15,7 @@
   "output_dir": "output/",
   "test_file_name": "test_data.csv",
   "max_seq_len": 20,
-  "num_workers": 4,
+  "num_workers": 1,
   "pin_mem": true,
   "hidden_dim": 64,
   "n_layers": 2,
