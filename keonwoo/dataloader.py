@@ -13,10 +13,14 @@ class Preprocess:
     def __init__(self, args):
         self.args = args
         self.train_data = None
+        self.valid_data = None
         self.test_data = None
 
     def get_train_data(self):
         return self.train_data
+
+    def get_valid_data(self):
+        return self.valid_data
 
     def get_test_data(self):
         return self.test_data
@@ -40,7 +44,11 @@ class Preprocess:
         np.save(le_path, encoder.classes_)
 
     def __preprocessing(self, df, is_train=True):
-        cate_cols = ["assessmentItemID", "testId", "KnowledgeTag"]
+        cate_cols = [
+            "assessmentItemID",
+            "testId",
+            "KnowledgeTag",
+        ]
 
         if not os.path.exists(self.args.asset_dir):
             os.makedirs(self.args.asset_dir)
@@ -64,13 +72,13 @@ class Preprocess:
             test = le.transform(df[col])
             df[col] = test
 
-        def convert_time(s):
-            timestamp = time.mktime(
-                datetime.strptime(s, "%Y-%m-%d %H:%M:%S").timetuple()
-            )
-            return int(timestamp)
+        # def convert_time(s):
+        #     timestamp = time.mktime(
+        #         datetime.strptime(s, "%Y-%m-%d %H:%M:%S").timetuple()
+        #     )
+        #     return int(timestamp)
 
-        df["Timestamp"] = df["Timestamp"].apply(convert_time)
+        # df["Timestamp"] = df["Timestamp"].apply(convert_time)
 
         return df
 
@@ -80,6 +88,7 @@ class Preprocess:
 
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
+
         df = pd.read_csv(csv_file_path)  # , nrows=100000)
         df = self.__feature_engineering(df)
         df = self.__preprocessing(df, is_train)
@@ -95,10 +104,6 @@ class Preprocess:
         self.args.n_tag = len(
             np.load(os.path.join(self.args.asset_dir, "KnowledgeTag_classes.npy"))
         )
-        self.args.n_elapsed = len(
-            np.load(os.path.join(self.args.asset_dir, "elapsed_classes.npy"))
-        )
-
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
         columns = [
             "userID",
@@ -106,8 +111,12 @@ class Preprocess:
             "testId",
             "answerCode",
             "KnowledgeTag",
-            "elapsed",
+            "normalized_elapsed",
+            "normalized_timestamp",
+            "grade_acc",
+            "user_acc",
         ]
+
         group = (
             df[columns]
             .groupby("userID")
@@ -117,7 +126,10 @@ class Preprocess:
                     r["assessmentItemID"].values,
                     r["KnowledgeTag"].values,
                     r["answerCode"].values,
-                    r["elapsed"].values,
+                    r["normalized_elapsed"].values,
+                    r["normalized_timestamp"].values,
+                    r["grade_acc"].values,
+                    r["user_acc"].values,
                 )
             )
         )
@@ -125,6 +137,7 @@ class Preprocess:
         return group.values
 
     def load_train_data(self, file_name):
+        # self.train_data, self.valid_data = self.load_data_from_file(file_name)
         self.train_data = self.load_data_from_file(file_name)
 
     def load_test_data(self, file_name):
@@ -143,9 +156,27 @@ class DKTDataset(torch.utils.data.Dataset):
         # 각 data의 sequence length
         seq_len = len(row[0])
 
-        test, question, tag, correct, elapsed = row[0], row[1], row[2], row[3], row[4]
+        (test, question, tag, correct, elapsed, timestamp, grade_acc, user_acc) = (
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+            row[4],
+            row[5],
+            row[6],
+            row[7],
+        )
 
-        cate_cols = [test, question, tag, correct, elapsed]
+        cate_cols = [
+            test,
+            question,
+            tag,
+            correct,
+            elapsed,
+            timestamp,
+            grade_acc,
+            user_acc,
+        ]
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:

@@ -8,7 +8,7 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
-from .model import LSTM, Bert, Last_Query_Transformer
+from .model import LSTM, Bert, LastQuery
 
 import wandb
 
@@ -95,9 +95,9 @@ def train(train_loader, model, optimizer, args):
 
         preds = model(input)
         targets = input[3]  # correct
-        if args.model == "lqt":
-            preds = preds[0].squeeze()
-            targets = targets[:, -1]
+        # if args.model == "lqt":
+        #     preds = preds[0].squeeze()
+        #     targets = targets[:, -1]
 
         loss = compute_loss(preds, targets)
         update_params(loss, model, optimizer, args)
@@ -106,9 +106,9 @@ def train(train_loader, model, optimizer, args):
             print(f"Training steps: {step} Loss: {str(loss.item())}")
 
         # predictions
-        if args.model != "lqt":
-            preds = preds[:, -1]
-            targets = targets[:, -1]
+        # if args.model != "lqt":
+        preds = preds[:, -1]
+        targets = targets[:, -1]
 
         if args.device == "cuda":
             preds = preds.to("cpu").detach().numpy()
@@ -141,14 +141,14 @@ def validate(valid_loader, model, args):
 
         preds = model(input)
         targets = input[3]  # correct
-        if args.model == "lqt":
-            preds = preds[0].squeeze()
-            targets = targets[:, -1]
+        # if args.model == "lqt":
+        #     preds = preds[0].squeeze()
+        #     targets = targets[:, -1]
 
         # predictions
-        if args.model != "lqt":
-            preds = preds[:, -1]
-            targets = targets[:, -1]
+        # if args.model != "lqt":
+        preds = preds[:, -1]
+        targets = targets[:, -1]
 
         if args.device == "cuda":
             preds = preds.to("cpu").detach().numpy()
@@ -185,10 +185,10 @@ def inference(args, test_data):
         preds = model(input)
 
         # predictions
-        if args.model == "lqt":
-            preds = preds[0].squeeze()
-        else:
-            preds = preds[:, -1]
+        # if args.model == "lqt":
+        #     preds = preds[0].squeeze()
+        # else:
+        preds = preds[:, -1]
 
         if args.device == "cuda":
             preds = preds.to("cpu").detach().numpy()
@@ -218,7 +218,7 @@ def get_model(args):
     if args.model == "bert":
         model = Bert(args)
     if args.model == "lqt":
-        model = Last_Query_Transformer(args)
+        model = LastQuery(args)
 
     model.to(args.device)
 
@@ -228,25 +228,39 @@ def get_model(args):
 # 배치 전처리
 def process_batch(batch, args):
 
-    test, question, tag, correct, elapsed, mask = batch
+    (
+        test,
+        question,
+        tag,
+        correct,
+        elapsed,
+        timestamp,
+        grade_acc,
+        user_acc,
+        mask,
+    ) = batch
 
     # change to float
     mask = mask.type(torch.FloatTensor)
     correct = correct.type(torch.FloatTensor)
 
-    #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
-    #    saint의 경우 decoder에 들어가는 input이다
+    # interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     interaction = correct + 1  # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
-    interaction[:, 0] = 0  # set padding index to the first sequence
-    interaction = (interaction * mask).to(torch.int64)
+    interaction_mask = mask.roll(shifts=1, dims=1)
+    interaction_mask[:, 0] = 0
+    interaction = (interaction * interaction_mask).to(torch.int64)
+
     # print(interaction)
     # exit()
     #  test_id, question_id, tag
     test = ((test + 1) * mask).to(torch.int64)
     question = ((question + 1) * mask).to(torch.int64)
     tag = ((tag + 1) * mask).to(torch.int64)
-    elapsed = ((elapsed + 1) * mask).to(torch.int64)
+    elapsed = ((elapsed) * mask).to(torch.float32)
+    timestamp = ((timestamp) * mask).to(torch.float32)
+    grade_acc = ((grade_acc) * mask).to(torch.float32)
+    user_acc = ((user_acc) * mask).to(torch.float32)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -262,11 +276,26 @@ def process_batch(batch, args):
     correct = correct.to(args.device)
     mask = mask.to(args.device)
     elapsed = elapsed.to(args.device)
+    timestamp = timestamp.to(args.device)
+    grade_acc = grade_acc.to(args.device)
+    user_acc = user_acc.to(args.device)
 
     interaction = interaction.to(args.device)
     gather_index = gather_index.to(args.device)
 
-    return (test, question, tag, correct, elapsed, mask, interaction, gather_index)
+    return (
+        test,
+        question,
+        tag,
+        correct,
+        elapsed,
+        timestamp,
+        grade_acc,
+        user_acc,
+        mask,
+        interaction,
+        gather_index,
+    )
 
 
 # loss계산하고 parameter update!
@@ -279,8 +308,7 @@ def compute_loss(preds, targets):
     """
     loss = get_criterion(preds, targets)
     # 마지막 시퀀드에 대한 값만 loss 계산
-    if len(loss.shape) == 2:
-        loss = loss[:, -1]
+    loss = loss[:, -1]
     loss = torch.mean(loss)
     return loss
 
