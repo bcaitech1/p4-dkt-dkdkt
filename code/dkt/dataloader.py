@@ -10,10 +10,8 @@ import numpy as np
 import torch
 from importlib import import_module
 from tqdm.auto import tqdm
-# from dkt.utils import convert_time
+from dkt.utils import convert_time
 
-from datetime import datetime
-import time
 
 class Preprocess:
     def __init__(self,args):
@@ -53,8 +51,7 @@ class Preprocess:
     def __preprocessing(self, df, is_train = True):
 
         os.makedirs(self.args.asset_dir,exist_ok=True)
-        if 'KnowledgeTag' in df.columns:
-            df['KnowledgeTag'] = df['KnowledgeTag'].astype(str)
+        if 'KnowledgeTag' in df.columns: df['KnowledgeTag'] = df['KnowledgeTag'].astype(str)
         self.args.non_cate_cols = [] # column for continuous feature.
         cate_cols = []
         for col in df.columns:
@@ -81,11 +78,7 @@ class Preprocess:
             df[col]= df[col].astype(str)
             test = le.transform(df[col])
             df[col] = test
-        
-        def convert_time(s):
-            timestamp = time.mktime(datetime.strptime(s, '%Y-%m-%d %H:%M:%S').timetuple())
-            return int(timestamp)
-  
+         
         print("Convert Timestamp...")
         df['Timestamp'] = df['Timestamp'].apply(convert_time)        
         print("--preprocessing done--")
@@ -117,7 +110,7 @@ class Preprocess:
 
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_csv(csv_file_path)
+        df = pd.read_csv(csv_file_path, nrows=1000)
         df = self.__feature_engineering(df)
         df, cate_cols = self.__preprocessing(df, is_train)
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용

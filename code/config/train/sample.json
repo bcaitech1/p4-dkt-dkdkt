@@ -1,139 +1,33 @@
 {
-    "lr": {
-        "desc": null,
-        "value": 0.0001
-    },
-    "seed": {
-        "desc": null,
-        "value": 42
-    },
-    "model": {
-        "desc": null,
-        "value": "lstm"
-    },
-    "n_tag": {
-        "desc": null,
-        "value": 913
-    },
-    "_wandb": {
-        "desc": null,
-        "value": {
-            "t": {
-                "1": [
-                    1,
-                    5,
-                    11
-                ],
-                "2": [
-                    1,
-                    5,
-                    11
-                ],
-                "4": "3.7.7",
-                "5": "0.10.30",
-                "6": "4.6.1",
-                "8": [
-                    5
-                ]
-            },
-            "framework": "huggingface",
-            "cli_version": "0.10.30",
-            "is_jupyter_run": false,
-            "python_version": "3.7.7",
-            "is_kaggle_kernel": false,
-            "huggingface_version": "4.6.1"
-        }
-    },
-    "device": {
-        "desc": null,
-        "value": "cuda"
-    },
-    "n_test": {
-        "desc": null,
-        "value": 1538
-    },
-    "n_heads": {
-        "desc": null,
-        "value": 2
-    },
-    "data_dir": {
-        "desc": null,
-        "value": "/opt/ml/input/data/train_dataset"
-    },
-    "drop_out": {
-        "desc": null,
-        "value": 0.2
-    },
-    "n_epochs": {
-        "desc": null,
-        "value": 20
-    },
-    "n_layers": {
-        "desc": null,
-        "value": 2
-    },
-    "patience": {
-        "desc": null,
-        "value": 5
-    },
-    "asset_dir": {
-        "desc": null,
-        "value": "asset/"
-    },
-    "clip_grad": {
-        "desc": null,
-        "value": 10
-    },
-    "file_name": {
-        "desc": null,
-        "value": "train_data.csv"
-    },
-    "log_steps": {
-        "desc": null,
-        "value": 50
-    },
-    "model_dir": {
-        "desc": null,
-        "value": "models/"
-    },
-    "optimizer": {
-        "desc": null,
-        "value": "adam"
-    },
-    "scheduler": {
-        "desc": null,
-        "value": "plateau"
-    },
-    "batch_size": {
-        "desc": null,
-        "value": 64
-    },
-    "hidden_dim": {
-        "desc": null,
-        "value": 64
-    },
-    "model_name": {
-        "desc": null,
-        "value": "model.pt"
-    },
-    "output_dir": {
-        "desc": null,
-        "value": "output/"
-    },
-    "max_seq_len": {
-        "desc": null,
-        "value": 20
-    },
-    "n_questions": {
-        "desc": null,
-        "value": 9455
-    },
-    "num_workers": {
-        "desc": null,
-        "value": 1
-    },
-    "test_file_name": {
-        "desc": null,
-        "value": "test_data.csv"
-    }
+  "fes": [],
+  "no_fe_cache": null,
+  "json": null,
+  "exp_cfg": "./config/train/export/exported_config.json",
+  "no_select": null,
+  "seed": 42,
+  "device": "gpu",
+  "data_dir": "/opt/ml/input/data/train_dataset",
+  "asset_dir": "asset/",
+  "file_name": "cv_train_data.csv",
+  "val_name": null,
+  "model_dir": "models/",
+  "model_name": "model.pt",
+  "output_dir": "output/",
+  "test_file_name": "test_data.csv",
+  "max_seq_len": 20,
+  "num_workers": 1,
+  "pin_mem": true,
+  "hidden_dim": 64,
+  "n_layers": 2,
+  "n_heads": 2,
+  "drop_out": 0.2,
+  "n_epochs": 20,
+  "batch_size": 64,
+  "lr": 0.0001,
+  "clip_grad": 10,
+  "patience": 5,
+  "log_steps": 50,
+  "model": "lstm",
+  "optimizer": "adam",
+  "scheduler": "plateau"
 }
