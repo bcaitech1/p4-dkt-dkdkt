@@ -71,11 +71,11 @@ class Preprocess:
             df[col]= df[col].astype(str)
             test = le.transform(df[col])
             df[col] = test
-                    
-        print("preprocessing start")
-        df['Timestamp'] = df['Timestamp'].apply(convert_time)        
-        print("preprocessing done")
-        
+        if df['Timestamp'].dtype == object:
+            print("Processing Timestamp...")
+            df['Timestamp'] = df['Timestamp'].apply(convert_time)   
+            print("Processing Timestamp done")
+ 
         return df
 
     def __feature_engineering(self, df):
