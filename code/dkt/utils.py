@@ -73,9 +73,6 @@ def select_file_from_dir(init_dir, target_type=None):
             print("*****Wrong file type detected. select another.*****")
             print("***************************************************")
 
-
-
-
 def check_wandb_json(config)->bool:
     # Check if json file from wandb.ai.
     return list(config.values())[0] and 'desc' in list(config.values())[0].keys()
@@ -123,57 +120,46 @@ def export_config_as_json(config,  input_dir:str):
     # split by separator and get file_name and directory.
     input_dir = input_dir.split(sep)
     file_name = input_dir[-1]
-    export_dir = '/'.join(input_dir[:-1])
-    export_dir += '/'
+    export_dir = '/'.join(input_dir[:-1]) +'/'
     os.makedirs(export_dir, exist_ok=True)
-
     file_name = duplicate_name_changer(export_dir, file_name)
     
     with open(export_dir+file_name,'w') as outfile:
         json.dump(vars(config), outfile)
 
-def check_batch_available(arg_name, arg, batch_size):
-    if type(arg) == list:
-        if batch_size == None :
-            batch_size = len(arg)
-        elif batch_size != len(arg):
-            raise RuntimeError(f"length of argument {arg_name} doesn't match with other batched arguments. check your json file.") 
+def get_batch_size(config:dict):
+    # config values 중, list type이고, batch_size가 모두 같아야 하며, 해당 batch_size return
+    check_2d = ['fes']
+    config_vals = [v for k, v in config.items() if ((k in check_2d) and v and type(v[0]) == list) or ((k not in check_2d) and type(v) == list)]
+    batch_size = len(config_vals[0]) if config_vals else None
+    if any(len(i) != batch_size for i in config_vals):
+        raise RuntimeError(f"some length of argument doesn't match with other batched arguments. check your json file.") 
     return batch_size
 
 def batch_json_processing(config:argparse.Namespace):
-    unavailable = ["json", "exp_cfg", "no_select"]
+    
+    wand_db_argu = ['n_tag', '_wandb', 'n_test']
+    store_argu = ['column', 'non_cate_col', 'cate_col']
+    input_argu = ["json", "exp_cfg", "no_select"]
     check_2d = ['fes']
-    arg_list = {}
-    batch_size = None
-    result = [] 
+    unavailable = (wand_db_argu+store_argu+input_argu)
     config = vars(config)
-    for arg_name, arg in config.items():
-        if arg_name not in unavailable:
-            if arg_name not in check_2d:
-                if type(arg) == list:
-                    batch_size=check_batch_available(arg_name, arg, batch_size)
-            else:
-                # check if this list is 2d-list.
-                if len(arg) and type(arg[0]) == list:
-                    batch_size=check_batch_available(arg_name, arg, batch_size)
+    arg_list = {}
+    batch_size = get_batch_size(config)
     if batch_size:
-        for arg_name, arg in config.items():            
-            if arg_name not in unavailable:
-                if arg_name not in check_2d:
-                    if type(arg) == list:
-                        arg_list[arg_name] = arg
-                    else:
-                        arg_list[arg_name] = [arg for _ in range(batch_size)]
-                else:
-                    # check if this list is 2d-list.
-                    if len(arg) and type(arg[0]) == list:
-                        arg_list[arg_name] = arg
-                    else:
-                        arg_list[arg_name] = [arg for _ in range(batch_size)]
+        result = [] 
+        for arg_name, arg in config.items(): 
+            if (arg_name not in check_2d) and (type(arg) == list):
+                arg_list[arg_name] = arg
+            elif (arg_name in check_2d) and len(arg) and type(arg[0]) == list:
+                arg_list[arg_name] = arg
+            else:
+                arg_list[arg_name] = [arg for _ in range(batch_size)]
         for i in range(batch_size):
             arg_ele = {k:None for k in config.keys() if k not in unavailable}
             for k in arg_ele.keys():
                 arg_ele[k] = arg_list[k][i]    
+            arg_ele['model_suffix'] += "_batched"
             result.append(argparse.Namespace(**arg_ele))                    
         return result
     else:
@@ -189,8 +175,11 @@ def preprocess_arg(args:argparse.Namespace):
 
     # Get config from json:
     if not args.no_select:
-        # for json select mode
-        target_dir = './config/train/' if not hasattr(args, 'json') or args.json != 'lastest' else args.json 
+        # for json select mode        
+        if not hasattr(args, 'json') or args.json != 'lastest':
+            target_dir = './config/train/'
+        else:
+            target_dir = args.json 
         os.makedirs(target_dir, exist_ok=True)
         selected = select_file_from_dir(target_dir, 'json')
         args = import_config_from_json(selected) 
@@ -199,7 +188,6 @@ def preprocess_arg(args:argparse.Namespace):
         if args.json == "latest": 
             args.json = get_latest_modified_file()
         args = import_config_from_json(args.json) 
-
     args_list = []
     for args in batch_json_processing(args):
         # Change device based on server system.

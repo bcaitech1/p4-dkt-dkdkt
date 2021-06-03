@@ -25,8 +25,8 @@ def parse_args(mode='train'):
     parser.add_argument('--file_name', default='cv_train_data.csv', type=str, help='train file name')
     parser.add_argument('--val_name', nargs='?', const='cv_valid_data.csv', type=str, help='validation file name')
 
-    parser.add_argument('--model_dir', default='models/', type=str, help='model directory')
-    # parser.add_argument('--model_suffix', default='', type=str, help='model file name')
+    parser.add_argument('--model_dir', default='models/', type=str, help='model directory(default: models/)')
+    parser.add_argument('--save_suffix', default='', type=str, help='suffix for saving file(default: None)')
 
     parser.add_argument('--output_dir', default='output/', type=str, help='output directory')
     parser.add_argument('--test_file_name', default='test_data.csv', type=str, help='test file name')
@@ -48,10 +48,8 @@ def parse_args(mode='train'):
     parser.add_argument('--clip_grad', default=10, type=int, help='clip grad')
     parser.add_argument('--patience', default=5, type=int, help='for early stopping')
     
-
     parser.add_argument('--log_steps', default=50, type=int, help='print log per n steps')
     
-
     ### 중요 ###
     parser.add_argument('--model', default='lstm', type=str, help='model type')
     parser.add_argument('--optimizer', default='adam', type=str, help='optimizer type')

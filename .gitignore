@@ -407,6 +407,6 @@ tags
 
 ### User-specific ignore ###
 code/wandb
-code/model
-code/asset
+code/models
 code/config
+code/asset
