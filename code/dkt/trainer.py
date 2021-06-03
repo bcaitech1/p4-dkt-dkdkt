@@ -8,7 +8,7 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
-from .model import LSTM
+from .model import LSTM, Bert, LSTMATTN
 
 import wandb
 
@@ -71,7 +71,8 @@ def train(train_loader, model, optimizer, args):
     for step, batch in enumerate(train_loader):
         input = process_batch(batch, args)
         preds = model(input)
-        targets = input[3] # correct
+        # TODO 8 : 변경한 batch에 따라 3숫자 바꾸기
+        targets = input['answerCode'] # correct
 
 
         loss = compute_loss(preds, targets)
@@ -115,7 +116,7 @@ def validate(valid_loader, model, args):
         input = process_batch(batch, args)
 
         preds = model(input)
-        targets = input[3] # correct
+        targets = input['answerCode'] # correct
 
 
         # predictions
@@ -141,7 +142,6 @@ def validate(valid_loader, model, args):
     print(f'VALID AUC : {auc} ACC : {acc}\n')
 
     return auc, acc, total_preds, total_targets
-
 
 
 def inference(args, test_data):
@@ -180,8 +180,6 @@ def inference(args, test_data):
             w.write('{},{}\n'.format(id,p))
 
 
-
-
 def get_model(args):
     """
     Load model and move tensors to a given devices.
@@ -198,49 +196,41 @@ def get_model(args):
 
 # 배치 전처리
 def process_batch(batch, args):
-
-    test, question, tag, correct, mask = batch
-    
-    
+    # TODO 7 : 변경한 batch에 따라 3숫자 바꾸기
+    columns = args.cate_col + args.cont_col + ['answerCode', "mask", "interaction", "gather_index"]
+    batch_dict = dict(zip(columns,batch))
+    pr_batch_dict = dict(zip(columns,[0 for _ in columns]))
     # change to float
-    mask = mask.type(torch.FloatTensor)
-    correct = correct.type(torch.FloatTensor)
 
+    pr_batch_dict["mask"] = batch_dict['mask'].type(torch.FloatTensor)
+    pr_batch_dict["answerCode"] = batch_dict['answerCode'].type(torch.FloatTensor)
+    
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
-    interaction = correct + 1 # 패딩을 위해 correct값에 1을 더해준다.
-    interaction = interaction.roll(shifts=1, dims=1)
-    interaction[:, 0] = 0 # set padding index to the first sequence
-    interaction = (interaction * mask).to(torch.int64)
+    
+    pr_batch_dict["interaction"] = pr_batch_dict["answerCode"] + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    pr_batch_dict["interaction"] = pr_batch_dict["interaction"].roll(shifts=1, dims=1)
+    pr_batch_dict["interaction"][:, 0] = 0 # set padding index to the first sequence
+    pr_batch_dict["interaction"] = (pr_batch_dict["interaction"] * pr_batch_dict["mask"]).to(torch.int64)
+    
     # print(interaction)
     # exit()
+    
     #  test_id, question_id, tag
-    test = ((test + 1) * mask).to(torch.int64)
-    question = ((question + 1) * mask).to(torch.int64)
-    tag = ((tag + 1) * mask).to(torch.int64)
-
+    for c in args.cate_col :
+        pr_batch_dict[c] = ((batch_dict[c] + 1) * pr_batch_dict["mask"]).to(torch.int64)
+    for c in args.cont_col :
+        pr_batch_dict[c] = ((batch_dict[c]) * pr_batch_dict["mask"]).to(torch.float32)
     # gather index
     # 마지막 sequence만 사용하기 위한 index
-    gather_index = torch.tensor(np.count_nonzero(mask, axis=1))
-    gather_index = gather_index.view(-1, 1) - 1
+    pr_batch_dict["gather_index"] = torch.tensor(np.count_nonzero(pr_batch_dict["mask"], axis=1))
+    pr_batch_dict["gather_index"] = pr_batch_dict["gather_index"].view(-1, 1) - 1
 
-
+    # continuous 
+    for c in columns :
+        pr_batch_dict[c] = pr_batch_dict[c].to(args.device)
     # device memory로 이동
-
-    test = test.to(args.device)
-    question = question.to(args.device)
-
-
-    tag = tag.to(args.device)
-    correct = correct.to(args.device)
-    mask = mask.to(args.device)
-
-    interaction = interaction.to(args.device)
-    gather_index = gather_index.to(args.device)
-
-    return (test, question,
-            tag, correct, mask,
-            interaction, gather_index)
+    return pr_batch_dict
 
 
 # loss계산하고 parameter update!
@@ -256,6 +246,7 @@ def compute_loss(preds, targets):
     loss = loss[:,-1]
     loss = torch.mean(loss)
     return loss
+
 
 def update_params(loss, model, optimizer, args):
     loss.backward()
