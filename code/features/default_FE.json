@@ -1,0 +1,9 @@
+{
+  "description": "default csv, It changes nothing.",
+  "base_dataset": "cv_train_data.csv",
+  "features": {
+    "KnowledgeTag": {
+      "type": "str"
+    }
+  }
+}

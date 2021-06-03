@@ -30,7 +30,7 @@ def run(args, train_data, valid_data):
     best_auc = -1
     early_stopping_counter = 0
     log_json = {}
-    model_name = duplicate_name_changer(args.model_dir, args.model)
+    model_name = duplicate_name_changer(args.model_dir, f"{args.model}{args.save_suffix}")
     save_dir = os.path.join(f"{args.model_dir}{model_name}",str(args.k_fold_idx))
     os.makedirs(save_dir, exist_ok=True)
     for epoch in tqdm(range(args.n_epochs)):

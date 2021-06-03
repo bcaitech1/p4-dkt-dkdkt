@@ -7,6 +7,7 @@ import enquiries
 from pathlib import Path
 import time
 from datetime import datetime
+import pandas as pd
 
 def setSeeds(seed = 42):
     # 랜덤 시드를 설정하여 매 코드를 실행할 때마다 동일한 결과를 얻게 합니다.
@@ -28,6 +29,19 @@ def get_latest_created_file(data_dir="./config/train/", file_type="json")->str:
     latest_file = max(list_of_files, key=os.path.getctime)
     print(f"use {latest_file} file")
     return latest_file
+
+def get_col_type(df:pd.DataFrame):
+    cate_types = ['str', 'string', 'object', 'category']
+    column_mask = ['userID', 'Timestamp']
+    cate_cols, cont_cols = [], []
+    for column_name in df.columns:
+        if column_name in column_mask: continue
+        if df[column_name].dtype in cate_types:
+            cate_cols.append(column_name)
+        else:
+            cont_cols.append(column_name)
+
+    return cate_cols, cont_cols
 
 
 def get_latest_modified_file(data_dir="./config/train/", file_type="json")->str:    
@@ -78,21 +92,20 @@ def check_wandb_json(config)->bool:
     return list(config.values())[0] and 'desc' in list(config.values())[0].keys()
 
 
-def import_config_from_json(json_file:str):
+def import_data_from_json(json_file:str, return_type="argparse"):
     # Import config(json form) from directory.
     with open(json_file) as jf:
-        config = json.load(jf)
+        data = json.load(jf)
 
     # Fix inappropriate structure.
-    if check_wandb_json(config):
+    if check_wandb_json(data):
         print("convert wandb json to normal json")
-        for k,v in config.items():
-            config[k] = v['value']
-
-    config = argparse.Namespace(**config) 
-    return config
-
-
+        for k,v in data.items():
+            data[k] = v['value']
+    if return_type=="argparse":
+        data = argparse.Namespace(**data) 
+    return data
+    
 def duplicate_name_changer(target_dir, fname):
     #Prevent duplicate file name by adding suffix '_{n}'.
     idx = 1
@@ -129,8 +142,7 @@ def export_config_as_json(config,  input_dir:str):
 
 def get_batch_size(config:dict):
     # config values 중, list type이고, batch_size가 모두 같아야 하며, 해당 batch_size return
-    check_2d = ['fes']
-    config_vals = [v for k, v in config.items() if ((k in check_2d) and v and type(v[0]) == list) or ((k not in check_2d) and type(v) == list)]
+    config_vals = [v for _, v in config.items() if type(v) == list]
     batch_size = len(config_vals[0]) if config_vals else None
     if any(len(i) != batch_size for i in config_vals):
         raise RuntimeError(f"some length of argument doesn't match with other batched arguments. check your json file.") 
@@ -141,7 +153,6 @@ def batch_json_processing(config:argparse.Namespace):
     wand_db_argu = ['n_tag', '_wandb', 'n_test']
     store_argu = ['column', 'non_cate_col', 'cate_col']
     input_argu = ["json", "exp_cfg", "no_select"]
-    check_2d = ['fes']
     unavailable = (wand_db_argu+store_argu+input_argu)
     config = vars(config)
     arg_list = {}
@@ -149,9 +160,7 @@ def batch_json_processing(config:argparse.Namespace):
     if batch_size:
         result = [] 
         for arg_name, arg in config.items(): 
-            if (arg_name not in check_2d) and (type(arg) == list):
-                arg_list[arg_name] = arg
-            elif (arg_name in check_2d) and len(arg) and type(arg[0]) == list:
+            if type(arg) == list:
                 arg_list[arg_name] = arg
             else:
                 arg_list[arg_name] = [arg for _ in range(batch_size)]
@@ -182,12 +191,12 @@ def preprocess_arg(args:argparse.Namespace):
             target_dir = args.json 
         os.makedirs(target_dir, exist_ok=True)
         selected = select_file_from_dir(target_dir, 'json')
-        args = import_config_from_json(selected) 
+        args = import_data_from_json(selected) 
     elif hasattr(args, 'json') and args.json != None: 
         # for json directory mode
         if args.json == "latest": 
             args.json = get_latest_modified_file()
-        args = import_config_from_json(args.json) 
+        args = import_data_from_json(args.json) 
     args_list = []
     for args in batch_json_processing(args):
         # Change device based on server system.
@@ -198,10 +207,5 @@ def preprocess_arg(args:argparse.Namespace):
                 print('*'*10,"CUDA Unavailable! Automatically change device to CPU",'*'*10)
             device = "cpu"
         args.device = device 
-
-        # Feature Engineering.
-        if not hasattr(args, 'fes'):
-            print("Warning! Update your code")
-            args.fes = []
         args_list.append(args)
     return args_list

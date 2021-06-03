@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from importlib import import_module
 from tqdm.auto import tqdm
-from dkt.utils import convert_time
+from code.dkt.utils import convert_time, get_col_type, import_data_from_json
 
 
 class Preprocess:
@@ -51,17 +51,8 @@ class Preprocess:
     def __preprocessing(self, df, is_train = True):
 
         os.makedirs(self.args.asset_dir,exist_ok=True)
-        if 'KnowledgeTag' in df.columns: df['KnowledgeTag'] = df['KnowledgeTag'].astype(str)
-        self.args.non_cate_cols = [] # column for continuous feature.
-        cate_cols = []
-        for col in df.columns:
-            if col != "userID" and col != "Timestamp" and col != "answerCode":
-                if df[col].dtype == object:
-                    cate_cols.append(col)
-                else:
-                    self.args.non_cate_cols.append(col)
 
-        for col in tqdm(cate_cols, desc="preprocessing categorical data..."):            
+        for col in tqdm(self.args.cate_cols, desc="preprocessing categorical data..."):            
             le = LabelEncoder()
             if is_train:
                 #For UNKNOWN class
@@ -79,33 +70,34 @@ class Preprocess:
             test = le.transform(df[col])
             df[col] = test
          
-        print("Convert Timestamp...")
-        df['Timestamp'] = df['Timestamp'].apply(convert_time)        
-        print("--preprocessing done--")
+        if df['Timestamp'].dtype == object:
+            print("Processing Timestamp...")
+            df['Timestamp'] = df['Timestamp'].apply(convert_time)   
+            print("Processing Timestamp done")
+ 
 
-        return df, cate_cols
+        return df
 
     def __feature_engineering(self, df):        
-        # cate_cols = ['assessmentItemID', 'testId', 'KnowledgeTag']
-        if self.args.fes == []:
-            print("----No FE Detected.----")
-        else:
-            fes = []
-            # df = df.drop(columns=['Unnamed: 0'], errors='ignore')
-            t = tqdm(self.args.fes, desc="start feature engineering...")
-            for fe in t:
-                t.set_description(f"feature {fe} processing...")
-                new_feature:function = getattr(import_module(
-                f"features.{fe}"), 'run') 
-                fes += new_feature(df, not self.args.no_fe_cache)
-            
-            for fe in fes:
-                if fe['job'] == "del":
-                    df = df.drop(columns=fe['columns'], errors='ignore')
-                else :
-                    for series in fe['columns']:
-                        if series.name in df.columns: raise KeyError(f"{series.name} column already exist.")
-                        df[series.name] = series
+        cate_types = ['str', 'string', 'object', 'category']
+        # cont_types = ['int', 'float', 'long', 'int64', 'float64', 'int32', 'datetime', 'datetime64']
+        fe_path = os.path.join(self.args.fe_dir, self.args.fe_set)
+        fe_set = import_data_from_json(fe_path)
+        print(f"Using {self.args.fe_set} file for Featre Engineering.")
+        if fe_set['base_dataset'] != self.args.file_name: print("Warning! Input dataset is not matched with FE target dataset.")
+        self.args.cate_cols, self.args.cont_cols = get_col_type(df)
+        for col_name, col_info in fe_set['featrues'].items():
+            if col_info != None and col_info != "del": 
+                df[col_name] = pd.Series.from_csv(col_info['column'])
+                df[col_name].astype(col_info['type'].lower())
+                if col_info['type'].lower() in cate_types: self.args.cate_cols.append(col_name)
+                else: self.args.cont_cols.append('col_info')
+            else:
+                df = df.drop(col_name)
+                if col_name in self.args.cate_cols:
+                    self.args.cate_cols.remove(col_name)
+                elif col_name in self.args.cont_cols:
+                    self.args.cont_cols.remove(col_name)
         return df
 
     def load_data_from_file(self, file_name, is_train=True):
@@ -114,19 +106,20 @@ class Preprocess:
         df = self.__feature_engineering(df)
         df, cate_cols = self.__preprocessing(df, is_train)
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
-        self.args.cate_cols = {} # arg for categorical columns and index num.
+        cate_cols = [i for i in self.args.cate_cols]
+        self.args.cate_cols = {}
         for col in cate_cols:
             self.args.cate_cols[col] = (len(np.load(os.path.join(self.args.asset_dir,f'{col}_classes.npy'))))
 
-        columns = list(df.columns)
-        if 'Timestamp' in columns: columns.remove('Timestamp')       
-        self.args.columns = [i for i in columns] # arg for column sequence info.
-        if 'userID' in columns: self.args.columns.remove('userID')
-
         df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        self.args.columns.append('mask')
+        
+        group = df[cate_cols + self.args.cont_cols].groupby('userID').apply(set_column)
 
-        group = df[columns].groupby('userID').apply(set_column)
+        self.args.column_seq = group.columns
+        self.args.column_seq.remove('userID')
+        self.args.column_seq.remove('Timestamp')
+        self.args.column_seq.append('mask')
+        
         return group.values
 
     def load_train_data(self, file_name):
@@ -161,7 +154,7 @@ class DKTDataset(torch.utils.data.Dataset):
         # test, question, tag, correct = row[0], row[1], row[2], row[3]
         
         # need to refactoring!
-        cols = [row[i] for i, col_name in enumerate(self.args.columns) if col_name != 'mask']
+        cols = [row[i] for i, col_name in enumerate(self.args.column_seq) if col_name != 'mask']
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
         if seq_len > self.args.max_seq_len:

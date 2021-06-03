@@ -5,15 +5,13 @@ from typing import Optional
 def parse_args(mode='train'):
     parser = argparse.ArgumentParser()
     # custom Feature engineerings
-    parser.add_argument('--fes', default=[], nargs='+', help='names of FE funcs.')
-    parser.add_argument('--no_fe_cache', nargs='?', const=True, type=bool, help='dont use caching during FE.(default: False)' )
-
-    
+    parser.add_argument('--fe_dir', default="./features/", type=str, help='directory of FE set. (default: ./features/)')
+    parser.add_argument('--fe_set', default="default_FE.json", type=str, help='name of FE Set. (default: default_FE.json)')
+   
     # custom config input output
     parser.add_argument('--json', nargs='?', const='latest', type=str, help='get argument form json file. (default: get lastets file from config/train)' )
     parser.add_argument('--exp_cfg', nargs='?', const='./config/train/export/exported_config.json', type=str, help='Directory and name of exported config.')
     parser.add_argument('--no_select', nargs='?', const=True, type=bool, help='Select config json from directory given at "json" argument. (default: False)' )
-
 
     parser.add_argument('--seed', default=42, type=int, help='seed')
     
