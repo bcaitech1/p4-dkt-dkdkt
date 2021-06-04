@@ -198,9 +198,9 @@ class LastQuery(nn.Module):
             nn.Linear((self.hidden_dim) * 4, self.hidden_dim),
             nn.LayerNorm(self.hidden_dim),
         )
-        self.cont_bn = nn.BatchNorm1d(4)
+        self.cont_bn = nn.BatchNorm1d(3)
         self.cont_emb = nn.Sequential(
-            nn.Linear(4, self.hidden_dim),
+            nn.Linear(3, self.hidden_dim),
             nn.LayerNorm(self.hidden_dim),
         )
 
@@ -260,8 +260,7 @@ class LastQuery(nn.Module):
             _,
             elapsed,
             timestamp,
-            grade_acc,
-            user_acc,
+            problem_number,
             mask,
             interaction,
             index,
@@ -270,6 +269,7 @@ class LastQuery(nn.Module):
         seq_len = interaction.size(1)
 
         # 신나는 embedding
+        # Categorical embedding
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
@@ -291,8 +291,7 @@ class LastQuery(nn.Module):
             (
                 elapsed.unsqueeze(-1),
                 timestamp.unsqueeze(-1),
-                grade_acc.unsqueeze(-1),
-                user_acc.unsqueeze(-1),
+                problem_number.unsqueeze(-1),
             ),
             dim=-1,
         )

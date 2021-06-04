@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 
-
+from sklearn import preprocessing
 from .dataloader import get_loaders
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
@@ -235,8 +235,7 @@ def process_batch(batch, args):
         correct,
         elapsed,
         timestamp,
-        grade_acc,
-        user_acc,
+        problem_number,
         mask,
     ) = batch
 
@@ -259,8 +258,7 @@ def process_batch(batch, args):
     tag = ((tag + 1) * mask).to(torch.int64)
     elapsed = ((elapsed) * mask).to(torch.float32)
     timestamp = ((timestamp) * mask).to(torch.float32)
-    grade_acc = ((grade_acc) * mask).to(torch.float32)
-    user_acc = ((user_acc) * mask).to(torch.float32)
+    problem_number = ((problem_number) * mask).to(torch.float32)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -271,15 +269,12 @@ def process_batch(batch, args):
 
     test = test.to(args.device)
     question = question.to(args.device)
-
     tag = tag.to(args.device)
     correct = correct.to(args.device)
     mask = mask.to(args.device)
     elapsed = elapsed.to(args.device)
     timestamp = timestamp.to(args.device)
-    grade_acc = grade_acc.to(args.device)
-    user_acc = user_acc.to(args.device)
-
+    problem_number = problem_number.to(args.device)
     interaction = interaction.to(args.device)
     gather_index = gather_index.to(args.device)
 
@@ -290,8 +285,7 @@ def process_batch(batch, args):
         correct,
         elapsed,
         timestamp,
-        grade_acc,
-        user_acc,
+        problem_number,
         mask,
         interaction,
         gather_index,
