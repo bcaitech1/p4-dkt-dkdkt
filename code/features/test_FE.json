@@ -1,0 +1,9 @@
+{
+  "description": "test",
+  "base_dataset": "dump_data.csv",
+  "features": {
+    "KnowledgeTag": {
+      "type": "str"
+    }
+  }
+}

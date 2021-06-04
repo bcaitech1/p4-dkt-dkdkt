@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from importlib import import_module
 from tqdm.auto import tqdm
-from code.dkt.utils import convert_time, get_col_type, import_data_from_json
+from dkt.utils import convert_time, get_col_type, import_data_from_json
 
 
 class Preprocess:
@@ -82,29 +82,39 @@ class Preprocess:
         cate_types = ['str', 'string', 'object', 'category']
         # cont_types = ['int', 'float', 'long', 'int64', 'float64', 'int32', 'datetime', 'datetime64']
         fe_path = os.path.join(self.args.fe_dir, self.args.fe_set)
-        fe_set = import_data_from_json(fe_path)
+        fe_set = import_data_from_json(fe_path,"dict")
+        
         print(f"Using {self.args.fe_set} file for Featre Engineering.")
+
         if fe_set['base_dataset'] != self.args.file_name: print("Warning! Input dataset is not matched with FE target dataset.")
-        self.args.cate_cols, self.args.cont_cols = get_col_type(df)
-        for col_name, col_info in fe_set['featrues'].items():
-            if col_info != None and col_info != "del": 
-                df[col_name] = pd.Series.from_csv(col_info['column'])
-                df[col_name].astype(col_info['type'].lower())
-                if col_info['type'].lower() in cate_types: self.args.cate_cols.append(col_name)
-                else: self.args.cont_cols.append('col_info')
-            else:
+
+        for col_name, col_info in fe_set['features'].items():
+            if col_info!= "del": 
+                if col_info.get('column') : df[col_name] = pd.Series.from_csv(col_info['column'])
+                df[col_name] = df[col_name].astype("object" if col_info['type'] in cate_types else col_info['type'])
+            elif col_info == "del":
                 df = df.drop(col_name)
-                if col_name in self.args.cate_cols:
-                    self.args.cate_cols.remove(col_name)
-                elif col_name in self.args.cont_cols:
-                    self.args.cont_cols.remove(col_name)
+
+        self.args.cate_cols, self.args.cont_cols = get_col_type(df)
+
+        # for col_name, col_info in fe_set['featrues'].items():
+        #     if col_info != None and col_info != "del": 
+        #         if col_info['type'].lower() in cate_types: 
+        #             self.args.cate_cols.append(col_name)
+        #         else: self.args.cont_cols.append('col_info')
+        #     else:
+        #         if col_name in self.args.cate_cols:
+        #             self.args.cate_cols.remove(col_name)
+        #         elif col_name in self.args.cont_cols:
+        #             self.args.cont_cols.remove(col_name)
+
         return df
 
     def load_data_from_file(self, file_name, is_train=True):
         csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_csv(csv_file_path, nrows=1000)
+        df = pd.read_csv(csv_file_path)
         df = self.__feature_engineering(df)
-        df, cate_cols = self.__preprocessing(df, is_train)
+        df = self.__preprocessing(df, is_train)
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
         cate_cols = [i for i in self.args.cate_cols]
         self.args.cate_cols = {}
@@ -112,12 +122,13 @@ class Preprocess:
             self.args.cate_cols[col] = (len(np.load(os.path.join(self.args.asset_dir,f'{col}_classes.npy'))))
 
         df = df.sort_values(by=['userID','Timestamp'], axis=0)
-        
-        group = df[cate_cols + self.args.cont_cols].groupby('userID').apply(set_column)
 
-        self.args.column_seq = group.columns
+        self.args.column_seq = list(df.columns)
         self.args.column_seq.remove('userID')
         self.args.column_seq.remove('Timestamp')
+        
+        group = df[df.columns].groupby('userID').apply(set_column)
+
         self.args.column_seq.append('mask')
         
         return group.values

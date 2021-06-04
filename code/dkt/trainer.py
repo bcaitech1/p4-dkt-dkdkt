@@ -30,9 +30,13 @@ def run(args, train_data, valid_data):
     best_auc = -1
     early_stopping_counter = 0
     log_json = {}
-    model_name = duplicate_name_changer(args.model_dir, f"{args.model}{args.save_suffix}")
-    save_dir = os.path.join(f"{args.model_dir}{model_name}",str(args.k_fold_idx))
+
+    model_name = duplicate_name_changer(
+        args.model_dir, f"{args.model}{args.save_suffix}")
+    save_dir = os.path.join(
+        f"{args.model_dir}{model_name}", str(args.k_fold_idx))
     os.makedirs(save_dir, exist_ok=True)
+
     for epoch in tqdm(range(args.n_epochs)):
 
         print(f"Start Training: Epoch {epoch + 1}")
@@ -48,10 +52,11 @@ def run(args, train_data, valid_data):
                   "valid_auc": auc, "valid_acc": acc}
         # TODO: model save or early stopping
         wandb.log(result)
-        
+
         result["train_loss"] = train_loss.item()
         log_json[epoch] = tensor_dict_to_str(result)
-        with open(f'{save_dir}/log.json','w') as f:
+
+        with open(f'{save_dir}/log.json', 'w') as f:
             json.dump(log_json, f)
         if auc > best_auc:
             best_auc = auc
@@ -61,7 +66,7 @@ def run(args, train_data, valid_data):
                 'epoch': epoch + 1,
                 'state_dict': model_to_save.state_dict(),
             },
-            tensor_dict_to_str(result),
+                tensor_dict_to_str(result),
                 save_dir, 'best.pt',
             )
             early_stopping_counter = 0
@@ -87,20 +92,18 @@ def train(train_loader, model, optimizer, args):
     losses = []
     for step, batch in enumerate(train_loader):
         input = process_batch(batch, args)
-        preds = model(input).to(args.device)
-        targets = input['answerCode']  # answerCode
+        preds = model(input)
+        targets = input['oth']['answerCode']  # answerCode
 
         loss = compute_loss(preds, targets)
         update_params(loss, model, optimizer, args)
-        
+
         if step % args.log_steps == 0:
             print(f"Training steps: {step} Loss: {str(loss.item())}")
 
         # predictions
-        # preds = preds[:,-1]
-        # targets = targets[:,-1]
-        preds = preds[-1, :]
-        targets = targets[-1, :]
+        preds = preds[:,-1]
+        targets = targets[:,-1]
 
         if args.device == 'cuda':
             # tensor를 numpy화할 때, gpu에서 진행불가, cpu로 넘겨야 함.
@@ -133,13 +136,11 @@ def validate(valid_loader, model, args):
         input = process_batch(batch, args)
 
         preds = model(input)
-        targets = input['answerCode']  # answerCode
+        targets = input['oth']['answerCode']  # answerCode
 
         # predictions
-        # preds = preds[:,-1]
-        # targets = targets[:,-1]
-        preds = preds[-1, :]
-        targets = targets[-1, :]
+        preds = preds[:,-1]
+        targets = targets[:,-1]
 
         if args.device == 'cuda':
             preds = preds.to('cpu').detach().numpy()
@@ -216,11 +217,14 @@ def get_model(args):
 def process_batch(batch, args):
 
     # test, question, tag, correct, mask = batch
-    batch_dict = {args.columns[i]: col for i, col in enumerate(batch)}
+    batch_dict = {args.column_seq[i]: col for i, col in enumerate(batch)}
+    other_dict = {}
 
     # change to float
-    batch_dict['mask'] = batch_dict['mask'].type(torch.FloatTensor)
-    batch_dict['answerCode'] = batch_dict['answerCode'].type(torch.FloatTensor)
+    other_dict['mask'] = batch_dict['mask'] = batch_dict['mask'].type(
+        torch.FloatTensor)
+    other_dict['answerCode'] = batch_dict['answerCode'] = batch_dict['answerCode'].type(
+        torch.FloatTensor)
 
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
@@ -228,20 +232,16 @@ def process_batch(batch, args):
     interaction = interaction.roll(shifts=1, dims=1)
     interaction_mask = batch_dict['mask'].roll(shifts=1, dims=1)
     interaction_mask[:, 0] = 0
-    # interaction[:, 0] = 0 # set padding index to the first sequence
-    # interaction = (interaction *  batch_dict['mask']).to(torch.int64)
     interaction = (interaction * interaction_mask).to(torch.int64)
-    # print(interaction)
-    # exit()
-    #  test_id, question_id, tag
+    cont_dict, cate_dict = {}, {}
     for col_name in batch_dict.keys():
         if col_name != "mask" and col_name != "answerCode":
-            if col_name in args.non_cate_cols:
-                batch_dict[col_name] = (
-                    (batch_dict[col_name]) * batch_dict['mask']).to(batch_dict[col_name].dtype)
+            if col_name in args.cont_cols:
+                cont_dict[col_name] = (
+                    batch_dict[col_name] * batch_dict['mask']).to(torch.float32).to(args.device)
             else:
-                batch_dict[col_name] = (
-                    (batch_dict[col_name] + 1) * batch_dict['mask']).to(torch.int64)
+                cate_dict[col_name] = (
+                    (batch_dict[col_name] + 1) * batch_dict['mask']).to(torch.int64).to(args.device)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -249,12 +249,17 @@ def process_batch(batch, args):
     gather_index = gather_index.view(-1, 1) - 1
 
     # device memory로 이동
-    for col_name in batch_dict.keys():
-        batch_dict[col_name] = batch_dict[col_name].to(args.device)
-    batch_dict['interaction'] = interaction.to(args.device)
-    batch_dict['gather_index'] = gather_index.to(args.device)
-
-    return batch_dict
+    # for col_name in batch_dict.keys():
+    #     batch_dict[col_name] = batch_dict[col_name].to(args.device)
+    other_dict['interaction'] = interaction.to(args.device)
+    other_dict['gather_index'] = gather_index.to(args.device)
+    other_dict['mask'] =other_dict['mask'].to(args.device)
+    other_dict['answerCode'] = other_dict['answerCode'].to(args.device)
+    return {
+        "cont": cont_dict,
+        "cate": cate_dict,
+        "oth": other_dict
+    }
 
 
 # loss계산하고 parameter update!

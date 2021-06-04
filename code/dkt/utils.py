@@ -32,18 +32,26 @@ def get_latest_created_file(data_dir="./config/train/", file_type="json")->str:
 
 def get_col_type(df:pd.DataFrame):
     cate_types = ['str', 'string', 'object', 'category']
-    column_mask = ['userID', 'Timestamp']
+    column_mask = ['userID', 'Timestamp', 'answerCode']
     cate_cols, cont_cols = [], []
     for column_name in df.columns:
         if column_name in column_mask: continue
-        if df[column_name].dtype in cate_types:
+        if str(df[column_name].dtype) in cate_types:
             cate_cols.append(column_name)
         else:
             cont_cols.append(column_name)
 
     return cate_cols, cont_cols
 
+def hidden_dim_allocator(input_dim,cols,mode="uniform"):
+    if mode=="uniform":
+        pass
+    elif mode=="halven":
+        pass
+    elif mode=="size":
+        pass
 
+    
 def get_latest_modified_file(data_dir="./config/train/", file_type="json")->str:    
     # Get latest file from given directory default: json
     print(f"get latest modified {file_type} file from {data_dir} ...")
@@ -92,13 +100,13 @@ def check_wandb_json(config)->bool:
     return list(config.values())[0] and 'desc' in list(config.values())[0].keys()
 
 
-def import_data_from_json(json_file:str, return_type="argparse"):
+def import_data_from_json(json_file:str, return_type="json"):
     # Import config(json form) from directory.
     with open(json_file) as jf:
         data = json.load(jf)
 
     # Fix inappropriate structure.
-    if check_wandb_json(data):
+    if return_type=="json" and check_wandb_json(data):
         print("convert wandb json to normal json")
         for k,v in data.items():
             data[k] = v['value']
@@ -168,7 +176,7 @@ def batch_json_processing(config:argparse.Namespace):
             arg_ele = {k:None for k in config.keys() if k not in unavailable}
             for k in arg_ele.keys():
                 arg_ele[k] = arg_list[k][i]    
-            arg_ele['model_suffix'] += "_batched"
+            arg_ele['save_suffix'] += "_batched"
             result.append(argparse.Namespace(**arg_ele))                    
         return result
     else:
