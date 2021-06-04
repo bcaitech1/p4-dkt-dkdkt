@@ -17,7 +17,7 @@ def augmentation(df, max_seq_len, slide_ratio=0.2):
         t_group = g.sort_values(by=["Timestamp"], axis=0).groupby(
             ["testId"], sort=False
         )
-        slide_window = int(len(t_group) * sliding_ratio)
+        slide_window = int(len(t_group) * slide_ratio)
         if slide_window == 0:
             aug_data = t_group.apply(lambda x: x)
             aug_data["aug_idx"] = int(aug_idx)
@@ -37,15 +37,15 @@ def augmentation(df, max_seq_len, slide_ratio=0.2):
                 break
             for k, (key, t) in enumerate(t_group):
                 if k >= start_idx:
-                    if len(aug_data) + len(t) > max_seq:
+                    if len(aug_data) + len(t) > max_seq_len:
                         break
                     t["aug_idx"] = int(aug_idx)
                     aug_data = aug_data.append(t)
-                    if j == aug_cnt - 2 and len(aug_data) > (max_seq // 2):
+                    if j == aug_cnt - 2 and len(aug_data) > (max_seq_len // 2):
                         tmp = tmp.append(t)
                     if k == len(t_group) - 1:
                         pass_last = True
-            if len(aug_data) < max_seq // 2:
+            if len(aug_data) < max_seq_len // 2:
                 tmp["aug_idx"] = int(aug_idx)
                 aug_data = tmp.append(aug_data)
             new = new.append(aug_data)
