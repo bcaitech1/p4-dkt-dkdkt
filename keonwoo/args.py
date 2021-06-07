@@ -21,14 +21,14 @@ def parse_args(mode="train"):
 
     parser.add_argument(
         "--train_file_name",
-        default="aug_train.csv",
+        default="aug_train_400.csv",
         type=str,
         help="train file name",
     )
 
     parser.add_argument(
         "--valid_file_name",
-        default="aug_valid.csv",
+        default="aug_valid_400.csv",
         type=str,
         help="train file name",
     )
@@ -45,13 +45,13 @@ def parse_args(mode="train"):
     )
     parser.add_argument(
         "--test_file_name",
-        default="aug_test.csv",
+        default="aug_test_400.csv",
         type=str,
         help="test file name",
     )
 
     parser.add_argument(
-        "--max_seq_len", default=200, type=int, help="max sequence length"
+        "--max_seq_len", default=400, type=int, help="max sequence length"
     )
     parser.add_argument("--num_workers", default=4, type=int, help="number of workers")
 
@@ -66,9 +66,9 @@ def parse_args(mode="train"):
     # 훈련
     parser.add_argument("--n_epochs", default=15, type=int, help="number of epochs")
     parser.add_argument("--batch_size", default=32, type=int, help="batch size")
-    parser.add_argument("--lr", default=1e-4, type=float, help="learning rate")
+    parser.add_argument("--lr", default=5e-5, type=float, help="learning rate")
     parser.add_argument("--clip_grad", default=10, type=int, help="clip grad")
-    parser.add_argument("--patience", default=10, type=int, help="for early stopping")
+    parser.add_argument("--patience", default=5, type=int, help="for early stopping")
 
     parser.add_argument(
         "--log_steps", default=50, type=int, help="print log per n steps"
@@ -78,7 +78,7 @@ def parse_args(mode="train"):
     parser.add_argument("--model", default="lqt", type=str, help="model type")
     parser.add_argument("--optimizer", default="adamW", type=str, help="optimizer type")
     parser.add_argument(
-        "--scheduler", default="plateau", type=str, help="scheduler type"
+        "--scheduler", default="linear_warmup", type=str, help="scheduler type"
     )
 
     args = parser.parse_args()

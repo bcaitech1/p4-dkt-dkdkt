@@ -59,7 +59,7 @@ class Preprocess:
             label_path = os.path.join(self.args.asset_dir, col + "_classes.npy")
             le.classes_ = np.load(label_path)
 
-            df[col] = df[col].apply(lambda x: x if x in le.classes_ else "unknown")
+            # df[col] = df[col].apply(lambda x: x if x in le.classes_ else "unknown")
 
             # 모든 컬럼이 범주형이라고 가정
             df[col] = df[col].astype(str)
@@ -108,6 +108,9 @@ class Preprocess:
             "elapsed",
             "Timestamp",
             "problem_number",
+            "test_mean",
+            "ItemID_mean",
+            "tag_mean",
             "aug_idx",
         ]
 
@@ -123,6 +126,9 @@ class Preprocess:
                     r["elapsed"].values,
                     r["Timestamp"].values,
                     r["problem_number"].values,
+                    r["test_mean"].values,
+                    r["ItemID_mean"].values,
+                    r["tag_mean"].values,
                 )
             )
         )
@@ -157,6 +163,9 @@ class Preprocess:
             "elapsed",
             "Timestamp",
             "problem_number",
+            "test_mean",
+            "ItemID_mean",
+            "tag_mean",
         ]
 
         group = (
@@ -171,6 +180,9 @@ class Preprocess:
                     r["elapsed"].values,
                     r["Timestamp"].values,
                     r["problem_number"].values,
+                    r["test_mean"].values,
+                    r["ItemID_mean"].values,
+                    r["tag_mean"].values,
                 )
             )
         )
@@ -201,7 +213,18 @@ class DKTDataset(torch.utils.data.Dataset):
         # 각 data의 sequence length
         seq_len = len(row[0])
 
-        (test, question, tag, correct, elapsed, timestamp, problem_number,) = (
+        (
+            test,
+            question,
+            tag,
+            correct,
+            elapsed,
+            timestamp,
+            problem_number,
+            test_mean,
+            ItemID_mean,
+            tag_mean,
+        ) = (
             row[0],
             row[1],
             row[2],
@@ -209,6 +232,9 @@ class DKTDataset(torch.utils.data.Dataset):
             row[4],
             row[5],
             row[6],
+            row[7],
+            row[8],
+            row[9],
         )
 
         cate_cols = [
@@ -219,6 +245,9 @@ class DKTDataset(torch.utils.data.Dataset):
             elapsed,
             timestamp,
             problem_number,
+            test_mean,
+            ItemID_mean,
+            tag_mean,
         ]
 
         # max seq len을 고려하여서 이보다 길면 자르고 아닐 경우 그대로 냅둔다
