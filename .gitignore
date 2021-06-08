@@ -406,3 +406,8 @@ tags
 .pororo/*
 
 ### User-specific ignore ###
+junseok/code/wandb/
+junseok/code/config/
+junseok/code/asset/
+junseok/code/output/
+junseok/code/models/
