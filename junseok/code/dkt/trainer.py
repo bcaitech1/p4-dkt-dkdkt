@@ -30,11 +30,16 @@ def run(args, train_data, valid_data):
     best_auc = -1
     early_stopping_counter = 0
     log_json = {}
-
+    if args.model_alias != '':
+        folder_name = args.model_alias
+        print("using model alias")
+    else: 
+        folder_name = args.model
     model_name = duplicate_name_changer(
-        args.model_dir, f"{args.model}{args.save_suffix}")
-    save_dir = os.path.join(
-        f"{args.model_dir}{model_name}", str(args.k_fold_idx))
+        args.model_dir, f"{folder_name}{args.save_suffix}")
+    # save_dir = os.path.join(
+    #     f"{args.model_dir}{model_name}", str(args.k_fold_idx))
+    save_dir = os.path.join(args.model_dir, model_name)
     os.makedirs(save_dir, exist_ok=True)
 
     for epoch in tqdm(range(args.n_epochs)):
@@ -57,7 +62,8 @@ def run(args, train_data, valid_data):
         log_json[epoch] = tensor_dict_to_str(result)
 
         with open(f'{save_dir}/log.json', 'w') as f:
-            json.dump(log_json, f)
+            json.dump(log_json, f, indent=4)
+
         if auc > best_auc:
             best_auc = auc
             # torch.nn.DataParallel로 감싸진 경우 원래의 model을 가져옵니다.
@@ -67,7 +73,7 @@ def run(args, train_data, valid_data):
                 'state_dict': model_to_save.state_dict(),
             },
                 tensor_dict_to_str(result),
-                save_dir, 'best.pt',
+                save_dir, 'best.pt', args
             )
             early_stopping_counter = 0
         else:
@@ -86,7 +92,6 @@ def run(args, train_data, valid_data):
 
 def train(train_loader, model, optimizer, args):
     model.train()
-
     total_preds = []
     total_targets = []
     losses = []
@@ -177,8 +182,7 @@ def inference(args, test_data):
         preds = model(input)
 
         # predictions
-        # preds = preds[:,-1]
-        preds = preds[-1, :]
+        preds = preds[:,-1]
 
         if args.device == 'cuda':
             preds = preds.to('cpu').detach().numpy()
@@ -186,10 +190,15 @@ def inference(args, test_data):
             preds = preds.detach().numpy()
 
         total_preds += list(preds)
+    
+    output_name = duplicate_name_changer(
+        args.output_dir, f"output{args.save_suffix}.csv")
 
-    write_path = os.path.join(args.output_dir, "output.csv")
+    write_path = os.path.join(args.output_dir, output_name)
+
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
+
     with open(write_path, 'w', encoding='utf8') as w:
         print("writing prediction : {}".format(write_path))
         w.write("id,prediction\n")
@@ -284,17 +293,30 @@ def update_params(loss, model, optimizer, args):
     optimizer.zero_grad()
 
 
-def save_checkpoint(state, result, save_dir, model_filename):
+def save_checkpoint(state, result, save_dir, model_filename, args):
     print('saving model ...')
     os.makedirs(save_dir, exist_ok=True)
     torch.save(state, os.path.join(save_dir, model_filename))
     with open(save_dir+'/best.json', 'w') as f:
-        json.dump(result, f)
+        json.dump(result, f, indent=4)
 
+    config_dict = {
+        "model": args.model,
+        "fe_set": args.fe_set,
+        "model_path": os.path.abspath(os.path.join(save_dir, model_filename)),
+        "test_data" : args.test_data
+    }
+
+    with open(save_dir+'/model_config.json', 'w') as f:
+        json.dump(config_dict, f, indent=4)
 
 def load_model(args):
-
-    model_path = os.path.join(args.model_dir, args.model_name)
+    if hasattr(args, 'model_path'):
+        model_path =  args.model_path
+    else:
+        model_path = os.path.join(args.model_dir, args.model_name)
+        model_path = os.path.join(model_path, "model_config.json")
+    if not os.path.exists(model_path): raise FileExistsError(f"dir {model_path} doesn't exists.")
     print("Loading Model from:", model_path)
     load_state = torch.load(model_path)
     model = get_model(args)

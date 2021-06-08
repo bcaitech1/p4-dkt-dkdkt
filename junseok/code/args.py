@@ -20,17 +20,20 @@ def parse_args(mode='train'):
     parser.add_argument('--data_dir', default='/opt/ml/input/data/train_dataset', type=str, help='data directory')
     parser.add_argument('--asset_dir', default='asset/', type=str, help='data directory')
     
-    parser.add_argument('--file_name', default='cv_train_data.csv', type=str, help='train file name')
-    parser.add_argument('--val_name', nargs='?', const='cv_valid_data.csv', type=str, help='validation file name')
+    parser.add_argument('--train_data', default='cv_train_data.csv', type=str, help='train file name')
+    parser.add_argument('--val_data', nargs='?', const='cv_valid_data.csv', type=str, help='validation file name')
+    parser.add_argument('--test_data', default='test_data.csv', type=str, help='test file name')
 
     parser.add_argument('--model_dir', default='models/', type=str, help='model directory(default: models/)')
+    parser.add_argument('--model_alias', default='', type=str, help='model output folder name(default: {your model name}/)')    
     parser.add_argument('--save_suffix', default='', type=str, help='suffix for saving file(default: None)')
 
-    parser.add_argument('--output_dir', default='output/', type=str, help='output directory')
-    parser.add_argument('--test_file_name', default='test_data.csv', type=str, help='test file name')
+    if mode=="inference":
+        parser.add_argument('--inf_config', type=str, default="lstm/",help='model file name like "{model_folder}/" or "{model_folder}" (default: lstm/))')
+        parser.add_argument('--output_dir', default='output/', type=str, help='output directory')
     
     parser.add_argument('--max_seq_len', default=20, type=int, help='max sequence length')
-    parser.add_argument('--num_workers', default=1, type=int, help='number of workers')
+    parser.add_argument('--num_workers', default=4, type=int, help='number of workers')
     parser.add_argument('--pin_mem', default=True, type=bool, help='using pin memory in dataloader(default:True)')
     
     # 모델

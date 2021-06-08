@@ -17,12 +17,12 @@ def main(args):
         setSeeds(args.seed)
 
         preprocess = Preprocess(args)
-        preprocess.load_train_data(args.file_name)
+        preprocess.load_train_data(args.train_data)
         train_data = preprocess.get_train_data()
 
-        if args.val_name:
+        if args.val_data:
             print("using validation_dataset...")
-            preprocess.load_valid_data(args.val_name)
+            preprocess.load_valid_data(args.val_data)
             valid_data = preprocess.get_valid_data()
         else:
             train_data, valid_data = preprocess.split_data(train_data)

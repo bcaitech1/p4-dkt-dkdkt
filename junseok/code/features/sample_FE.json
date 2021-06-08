@@ -1,0 +1,21 @@
+{
+  "description": "1.remove KnowledgeTag,\n 2.separate assessmentItemID into grade and assessmentItemID",
+  "train_data": "cv_train_cached.csv",
+  "val_data": "cv_val_cached.csv",
+  "test_data": "test_cached.csv",
+  "features": {
+    "KnowledgeTag": "del",
+    "assessmentItemID": {
+      "type": "cate",
+      "column": "/opt/ml/input/data/features/problemID/"
+    },
+    "grade": {
+      "type": "cate",
+      "column": "/opt/ml/input/data/features/grade/"
+    },
+    "user_acc": {
+      "type": "cont",
+      "column": "/opt/ml/input/data/features/user_acc/"
+    }
+  }
+}
