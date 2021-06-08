@@ -198,9 +198,9 @@ class LastQuery(nn.Module):
             nn.Linear((self.hidden_dim) * 4, self.hidden_dim),
             nn.LayerNorm(self.hidden_dim),
         )
-        self.cont_bn = nn.BatchNorm1d(4)
+        self.cont_bn = nn.BatchNorm1d(6)
         self.cont_emb = nn.Sequential(
-            nn.Linear(4, self.hidden_dim),
+            nn.Linear(6, self.hidden_dim),
             nn.LayerNorm(self.hidden_dim),
         )
 
@@ -243,6 +243,18 @@ class LastQuery(nn.Module):
         # use sine positional embeddinds
         return torch.arange(seq_len).unsqueeze(0)
 
+    def get_mask(self, seq_len, mask, batch_size):
+        new_mask = torch.zeros_like(mask)
+        new_mask[mask == 0] = 1
+        new_mask[mask != 0] = 0
+        mask = new_mask
+
+        # batchsize * n_head 수만큼 각 mask를 반복하여 증가시킨다
+        mask = mask.repeat(1, self.args.n_heads).view(
+            batch_size * self.args.n_heads, -1, seq_len
+        )
+        return mask.masked_fill(mask == 1, float("-inf"))
+
     def init_hidden(self, batch_size):
         h = torch.zeros(self.args.n_layers, batch_size, self.args.hidden_dim)
         h = h.to(self.device)
@@ -260,8 +272,10 @@ class LastQuery(nn.Module):
             _,
             elapsed,
             timestamp,
-            grade_acc,
-            user_acc,
+            problem_number,
+            test_mean,
+            ItemID_mean,
+            tag_mean,
             mask,
             interaction,
             index,
@@ -270,6 +284,7 @@ class LastQuery(nn.Module):
         seq_len = interaction.size(1)
 
         # 신나는 embedding
+        # Categorical embedding
         embed_interaction = self.embedding_interaction(interaction)
         embed_test = self.embedding_test(test)
         embed_question = self.embedding_question(question)
@@ -291,8 +306,10 @@ class LastQuery(nn.Module):
             (
                 elapsed.unsqueeze(-1),
                 timestamp.unsqueeze(-1),
-                grade_acc.unsqueeze(-1),
-                user_acc.unsqueeze(-1),
+                problem_number.unsqueeze(-1),
+                test_mean.unsqueeze(-1),
+                ItemID_mean.unsqueeze(-1),
+                tag_mean.unsqueeze(-1),
             ),
             dim=-1,
         )
@@ -312,14 +329,14 @@ class LastQuery(nn.Module):
         # embed = embed + embed_pos
 
         ####################### ENCODER #####################
+        self.mask = self.get_mask(seq_len, mask, batch_size).to(self.device)
         q = self.query(embed)[:, -1:, :].permute(1, 0, 2)
         k = self.key(embed).permute(1, 0, 2)
         v = self.value(embed).permute(1, 0, 2)
 
         ## attention
         # last query only
-        out, _ = self.attn(q, k, v)
-
+        out, _ = self.attn(q, k, v, attn_mask=self.mask)
         ## residual + layer norm
         out = out.permute(1, 0, 2)
         out = embed + out

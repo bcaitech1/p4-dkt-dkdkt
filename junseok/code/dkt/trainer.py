@@ -8,9 +8,13 @@ from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 from .criterion import get_criterion
 from .metric import get_metric
+<<<<<<< HEAD:junseok/code/dkt/trainer.py
 from .model import LSTM
 from dkt.utils import duplicate_name_changer, tensor_dict_to_str
 import json
+=======
+from .model import LSTM, Bert, LSTMATTN
+>>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
 import wandb
 
@@ -98,7 +102,13 @@ def train(train_loader, model, optimizer, args):
     for step, batch in enumerate(train_loader):
         input = process_batch(batch, args)
         preds = model(input)
+<<<<<<< HEAD:junseok/code/dkt/trainer.py
         targets = input['oth']['answerCode']  # answerCode
+=======
+        # TODO 8 : 변경한 batch에 따라 3숫자 바꾸기
+        targets = input['answerCode'] # correct
+
+>>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
         loss = compute_loss(preds, targets)
         update_params(loss, model, optimizer, args)
@@ -141,7 +151,12 @@ def validate(valid_loader, model, args):
         input = process_batch(batch, args)
 
         preds = model(input)
+<<<<<<< HEAD:junseok/code/dkt/trainer.py
         targets = input['oth']['answerCode']  # answerCode
+=======
+        targets = input['answerCode'] # correct
+
+>>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
         # predictions
         preds = preds[:,-1]
@@ -203,7 +218,11 @@ def inference(args, test_data):
         print("writing prediction : {}".format(write_path))
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
+<<<<<<< HEAD:junseok/code/dkt/trainer.py
             w.write('{},{}\n'.format(id, p))
+=======
+            w.write('{},{}\n'.format(id,p))
+>>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
 
 def get_model(args):
@@ -224,6 +243,7 @@ def get_model(args):
 
 # 배치 전처리
 def process_batch(batch, args):
+<<<<<<< HEAD:junseok/code/dkt/trainer.py
 
     # test, question, tag, correct, mask = batch
     batch_dict = {args.column_seq[i]: col for i, col in enumerate(batch)}
@@ -234,9 +254,20 @@ def process_batch(batch, args):
         torch.FloatTensor)
     other_dict['answerCode'] = batch_dict['answerCode'] = batch_dict['answerCode'].type(
         torch.FloatTensor)
+=======
+    # TODO 7 : 변경한 batch에 따라 3숫자 바꾸기
+    columns = args.cate_col + args.cont_col + ['answerCode', "mask", "interaction", "gather_index"]
+    batch_dict = dict(zip(columns,batch))
+    pr_batch_dict = dict(zip(columns,[0 for _ in columns]))
+    # change to float
+>>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
+    pr_batch_dict["mask"] = batch_dict['mask'].type(torch.FloatTensor)
+    pr_batch_dict["answerCode"] = batch_dict['answerCode'].type(torch.FloatTensor)
+    
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
+<<<<<<< HEAD:junseok/code/dkt/trainer.py
     interaction = batch_dict['answerCode'] + 1  # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
     interaction_mask = batch_dict['mask'].roll(shifts=1, dims=1)
@@ -269,6 +300,32 @@ def process_batch(batch, args):
         "cate": cate_dict,
         "oth": other_dict
     }
+=======
+    
+    pr_batch_dict["interaction"] = pr_batch_dict["answerCode"] + 1 # 패딩을 위해 correct값에 1을 더해준다.
+    pr_batch_dict["interaction"] = pr_batch_dict["interaction"].roll(shifts=1, dims=1)
+    pr_batch_dict["interaction"][:, 0] = 0 # set padding index to the first sequence
+    pr_batch_dict["interaction"] = (pr_batch_dict["interaction"] * pr_batch_dict["mask"]).to(torch.int64)
+    
+    # print(interaction)
+    # exit()
+    
+    #  test_id, question_id, tag
+    for c in args.cate_col :
+        pr_batch_dict[c] = ((batch_dict[c] + 1) * pr_batch_dict["mask"]).to(torch.int64)
+    for c in args.cont_col :
+        pr_batch_dict[c] = ((batch_dict[c]) * pr_batch_dict["mask"]).to(torch.float32)
+    # gather index
+    # 마지막 sequence만 사용하기 위한 index
+    pr_batch_dict["gather_index"] = torch.tensor(np.count_nonzero(pr_batch_dict["mask"], axis=1))
+    pr_batch_dict["gather_index"] = pr_batch_dict["gather_index"].view(-1, 1) - 1
+
+    # continuous 
+    for c in columns :
+        pr_batch_dict[c] = pr_batch_dict[c].to(args.device)
+    # device memory로 이동
+    return pr_batch_dict
+>>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
 
 # loss계산하고 parameter update!

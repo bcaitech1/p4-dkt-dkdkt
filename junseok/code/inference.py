@@ -1,15 +1,14 @@
 from dkt.utils import preprocess_inf_arg
 import os
 from args import parse_args
-from dkt.dataloader import Preprocess
+from dkt.dataloader import Preprocess, add_features
 from dkt import trainer
 import torch
 def main(args):
     device = "cuda" if torch.cuda.is_available() and args.device =="gpu" else "cpu"
     args.device = device
-
-    args = preprocess_inf_arg(args)
-    print("inference args : \n",args)
+    args = add_features(args)
+    
     preprocess = Preprocess(args)
     preprocess.load_test_data(args.test_data)
     test_data = preprocess.get_test_data()

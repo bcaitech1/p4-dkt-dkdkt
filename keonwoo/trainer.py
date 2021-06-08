@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 
-
+from sklearn import preprocessing
 from .dataloader import get_loaders
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
@@ -25,8 +25,8 @@ def run(args, train_data, valid_data):
     args.total_steps = int(len(train_loader.dataset) / args.batch_size) * (
         args.n_epochs
     )
-    # args.warmup_steps = args.total_steps // 10
-    args.warmup_steps = 0
+    args.warmup_steps = args.total_steps // 25
+    # args.warmup_steps = 0
 
     model = get_model(args)
     optimizer = get_optimizer(model, args)
@@ -39,7 +39,9 @@ def run(args, train_data, valid_data):
         print(f"Start Training: Epoch {epoch + 1}")
 
         ### TRAIN
-        train_auc, train_acc, train_loss = train(train_loader, model, optimizer, args)
+        train_auc, train_acc, train_loss = train(
+            train_loader, model, optimizer, args, scheduler
+        )
 
         ### VALID
         auc, acc, _, _ = validate(valid_loader, model, args)
@@ -79,12 +81,10 @@ def run(args, train_data, valid_data):
         # scheduler
         if args.scheduler == "plateau":
             scheduler.step(best_auc)
-        else:
-            scheduler.step()
     print(best_auc)
 
 
-def train(train_loader, model, optimizer, args):
+def train(train_loader, model, optimizer, args, scheduler):
     model.train()
 
     total_preds = []
@@ -120,6 +120,8 @@ def train(train_loader, model, optimizer, args):
         total_preds.append(preds)
         total_targets.append(targets)
         losses.append(loss)
+        if args.scheduler == "linear_warmup":
+            scheduler.step()
 
     total_preds = np.concatenate(total_preds)
     total_targets = np.concatenate(total_targets)
@@ -128,6 +130,7 @@ def train(train_loader, model, optimizer, args):
     auc, acc = get_metric(total_targets, total_preds)
     loss_avg = sum(losses) / len(losses)
     print(f"TRAIN AUC : {auc} ACC : {acc} LR: {get_lr(optimizer)}")
+
     return auc, acc, loss_avg
 
 
@@ -235,8 +238,10 @@ def process_batch(batch, args):
         correct,
         elapsed,
         timestamp,
-        grade_acc,
-        user_acc,
+        problem_number,
+        test_mean,
+        ItemID_mean,
+        tag_mean,
         mask,
     ) = batch
 
@@ -259,8 +264,10 @@ def process_batch(batch, args):
     tag = ((tag + 1) * mask).to(torch.int64)
     elapsed = ((elapsed) * mask).to(torch.float32)
     timestamp = ((timestamp) * mask).to(torch.float32)
-    grade_acc = ((grade_acc) * mask).to(torch.float32)
-    user_acc = ((user_acc) * mask).to(torch.float32)
+    problem_number = ((problem_number) * mask).to(torch.float32)
+    test_mean = ((test_mean) * mask).to(torch.float32)
+    ItemID_mean = ((ItemID_mean) * mask).to(torch.float32)
+    tag_mean = ((tag_mean) * mask).to(torch.float32)
 
     # gather index
     # 마지막 sequence만 사용하기 위한 index
@@ -271,15 +278,15 @@ def process_batch(batch, args):
 
     test = test.to(args.device)
     question = question.to(args.device)
-
     tag = tag.to(args.device)
     correct = correct.to(args.device)
     mask = mask.to(args.device)
     elapsed = elapsed.to(args.device)
     timestamp = timestamp.to(args.device)
-    grade_acc = grade_acc.to(args.device)
-    user_acc = user_acc.to(args.device)
-
+    problem_number = problem_number.to(args.device)
+    test_mean = test_mean.to(args.device)
+    ItemID_mean = ItemID_mean.to(args.device)
+    tag_mean = tag_mean.to(args.device)
     interaction = interaction.to(args.device)
     gather_index = gather_index.to(args.device)
 
@@ -290,8 +297,10 @@ def process_batch(batch, args):
         correct,
         elapsed,
         timestamp,
-        grade_acc,
-        user_acc,
+        problem_number,
+        test_mean,
+        ItemID_mean,
+        tag_mean,
         mask,
         interaction,
         gather_index,

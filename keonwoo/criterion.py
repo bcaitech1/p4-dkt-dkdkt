@@ -1,6 +1,7 @@
+
 import torch.nn as nn
 
 
 def get_criterion(pred, target):
     loss = nn.BCELoss(reduction="none")
-    return loss(pred, target) # - (pred-target)**2
+    return loss(pred, target)
