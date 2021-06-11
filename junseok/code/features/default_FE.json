@@ -1,0 +1,11 @@
+{
+  "description": "default csv, It changes nothing. \n consist of userID, Timsestamp, assessmentItemID, testId, answerCode, KnowledgeTag",
+  "train_data": "cv_train_data.csv",
+  "val_data": "cv_valid_data.csv",
+  "test_data": "test_data.csv",
+  "features": {
+    "KnowledgeTag": {
+      "type": "cate"
+    }
+  }
+}

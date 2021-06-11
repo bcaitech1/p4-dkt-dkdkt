@@ -1,0 +1,6 @@
+{
+    "model": "lstm",
+    "fe_set": "sample_FE.json",
+    "model_path": "/opt/ml/p4-dkt-dkdkt/code/models/test/best.pt",
+    "test_data": "test_data.csv"
+}
