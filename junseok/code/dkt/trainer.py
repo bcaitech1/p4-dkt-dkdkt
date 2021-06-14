@@ -6,15 +6,11 @@ from tqdm.auto import tqdm
 from .dataloader import get_loaders
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
-from .criterion import get_criterion
+from .criterion import epoch_update_gamma, get_criterion
 from .metric import get_metric
-<<<<<<< HEAD:junseok/code/dkt/trainer.py
-from .model import LSTM
+from .model import LSTM, LSTMATTN, LGBM, LastQuery, TfixupSaint
 from dkt.utils import duplicate_name_changer, tensor_dict_to_str
 import json
-=======
-from .model import LSTM, Bert, LSTMATTN
->>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
 import wandb
 
@@ -26,6 +22,7 @@ def run(args, train_data, valid_data):
     args.total_steps = int(len(train_loader.dataset) /
                            args.batch_size) * (args.n_epochs)
     args.warmup_steps = args.total_steps // 10
+    args.epoch = 0
 
     model = get_model(args)
     optimizer = get_optimizer(model, args)
@@ -45,9 +42,8 @@ def run(args, train_data, valid_data):
     #     f"{args.model_dir}{model_name}", str(args.k_fold_idx))
     save_dir = os.path.join(args.model_dir, model_name)
     os.makedirs(save_dir, exist_ok=True)
-
     for epoch in tqdm(range(args.n_epochs)):
-
+        
         print(f"Start Training: Epoch {epoch + 1}")
 
         # TRAIN
@@ -58,7 +54,7 @@ def run(args, train_data, valid_data):
         auc, acc, _, _ = validate(valid_loader, model, args)
 
         result = {"epoch": epoch, "train_loss": train_loss, "train_auc": train_auc, "train_acc": train_acc,
-                  "valid_auc": auc, "valid_acc": acc}
+                "valid_auc": auc, "valid_acc": acc}
         # TODO: model save or early stopping
         wandb.log(result)
 
@@ -102,15 +98,9 @@ def train(train_loader, model, optimizer, args):
     for step, batch in enumerate(train_loader):
         input = process_batch(batch, args)
         preds = model(input)
-<<<<<<< HEAD:junseok/code/dkt/trainer.py
         targets = input['oth']['answerCode']  # answerCode
-=======
-        # TODO 8 : 변경한 batch에 따라 3숫자 바꾸기
-        targets = input['answerCode'] # correct
 
->>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
-
-        loss = compute_loss(preds, targets)
+        loss = compute_loss(preds, targets, args)
         update_params(loss, model, optimizer, args)
 
         if step % args.log_steps == 0:
@@ -139,6 +129,13 @@ def train(train_loader, model, optimizer, args):
     auc, acc = get_metric(total_targets, total_preds)
     loss_avg = sum(losses)/len(losses)
     print(f'TRAIN AUC : {auc} ACC : {acc}')
+
+    if args.loss == 'roc_star' or args.loss == 'both':
+        total_targets, total_preds = torch.Tensor(total_targets).to(args.device), torch.Tensor(total_preds).to(args.device)
+        args.gamma = epoch_update_gamma(total_targets, total_preds, epoch=args.epoch, delta = args.delta)
+        args.last_target = total_targets 
+        args.last_predict = total_preds
+        args.epoch += 1
     return auc, acc, loss_avg
 
 
@@ -151,12 +148,7 @@ def validate(valid_loader, model, args):
         input = process_batch(batch, args)
 
         preds = model(input)
-<<<<<<< HEAD:junseok/code/dkt/trainer.py
         targets = input['oth']['answerCode']  # answerCode
-=======
-        targets = input['answerCode'] # correct
-
->>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
         # predictions
         preds = preds[:,-1]
@@ -218,11 +210,7 @@ def inference(args, test_data):
         print("writing prediction : {}".format(write_path))
         w.write("id,prediction\n")
         for id, p in enumerate(total_preds):
-<<<<<<< HEAD:junseok/code/dkt/trainer.py
             w.write('{},{}\n'.format(id, p))
-=======
-            w.write('{},{}\n'.format(id,p))
->>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
 
 def get_model(args):
@@ -231,10 +219,14 @@ def get_model(args):
     """
     if args.model == 'lstm':
         model = LSTM(args)
-    if args.model == 'lstmattn':
+    elif args.model == 'lstmattn':
         model = LSTMATTN(args)
-    if args.model == 'bert':
-        model = Bert(args)
+    elif args.model == 'lstqry':
+        model = LastQuery(args)
+    elif args.model == 'saint':
+        model = TfixupSaint(args)
+    elif 'tfixup' in args.model:
+        model = TfixupSaint(args)
 
     model.to(args.device)
 
@@ -243,7 +235,6 @@ def get_model(args):
 
 # 배치 전처리
 def process_batch(batch, args):
-<<<<<<< HEAD:junseok/code/dkt/trainer.py
 
     # test, question, tag, correct, mask = batch
     batch_dict = {args.column_seq[i]: col for i, col in enumerate(batch)}
@@ -254,20 +245,9 @@ def process_batch(batch, args):
         torch.FloatTensor)
     other_dict['answerCode'] = batch_dict['answerCode'] = batch_dict['answerCode'].type(
         torch.FloatTensor)
-=======
-    # TODO 7 : 변경한 batch에 따라 3숫자 바꾸기
-    columns = args.cate_col + args.cont_col + ['answerCode', "mask", "interaction", "gather_index"]
-    batch_dict = dict(zip(columns,batch))
-    pr_batch_dict = dict(zip(columns,[0 for _ in columns]))
-    # change to float
->>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
-
-    pr_batch_dict["mask"] = batch_dict['mask'].type(torch.FloatTensor)
-    pr_batch_dict["answerCode"] = batch_dict['answerCode'].type(torch.FloatTensor)
     
     #  interaction을 임시적으로 correct를 한칸 우측으로 이동한 것으로 사용
     #    saint의 경우 decoder에 들어가는 input이다
-<<<<<<< HEAD:junseok/code/dkt/trainer.py
     interaction = batch_dict['answerCode'] + 1  # 패딩을 위해 correct값에 1을 더해준다.
     interaction = interaction.roll(shifts=1, dims=1)
     interaction_mask = batch_dict['mask'].roll(shifts=1, dims=1)
@@ -300,46 +280,21 @@ def process_batch(batch, args):
         "cate": cate_dict,
         "oth": other_dict
     }
-=======
-    
-    pr_batch_dict["interaction"] = pr_batch_dict["answerCode"] + 1 # 패딩을 위해 correct값에 1을 더해준다.
-    pr_batch_dict["interaction"] = pr_batch_dict["interaction"].roll(shifts=1, dims=1)
-    pr_batch_dict["interaction"][:, 0] = 0 # set padding index to the first sequence
-    pr_batch_dict["interaction"] = (pr_batch_dict["interaction"] * pr_batch_dict["mask"]).to(torch.int64)
-    
-    # print(interaction)
-    # exit()
-    
-    #  test_id, question_id, tag
-    for c in args.cate_col :
-        pr_batch_dict[c] = ((batch_dict[c] + 1) * pr_batch_dict["mask"]).to(torch.int64)
-    for c in args.cont_col :
-        pr_batch_dict[c] = ((batch_dict[c]) * pr_batch_dict["mask"]).to(torch.float32)
-    # gather index
-    # 마지막 sequence만 사용하기 위한 index
-    pr_batch_dict["gather_index"] = torch.tensor(np.count_nonzero(pr_batch_dict["mask"], axis=1))
-    pr_batch_dict["gather_index"] = pr_batch_dict["gather_index"].view(-1, 1) - 1
-
-    # continuous 
-    for c in columns :
-        pr_batch_dict[c] = pr_batch_dict[c].to(args.device)
-    # device memory로 이동
-    return pr_batch_dict
->>>>>>> bc7974098ee70e917d4f9a9e53b654fb3b8481cc:code/dkt/trainer.py
 
 
 # loss계산하고 parameter update!
-def compute_loss(preds, targets):
+def compute_loss(preds, targets, args):
     """
     Args :
         preds   : (batch_size, max_seq_len)
         targets : (batch_size, max_seq_len)
 
     """
-    loss = get_criterion(preds, targets)
-    # 마지막 시퀀드에 대한 값만 loss 계산
-    loss = loss[:, -1]
-    loss = torch.mean(loss)
+    loss = get_criterion(preds, targets, args)
+    # 마지막 시퀀드에 대한 값만 loss 계산    
+    if args.loss == 'bce' or args.epoch == 0:
+        loss = loss[:, -1]
+        loss = torch.mean(loss)
     return loss
 
 
@@ -357,12 +312,8 @@ def save_checkpoint(state, result, save_dir, model_filename, args):
     with open(save_dir+'/best.json', 'w') as f:
         json.dump(result, f, indent=4)
 
-    config_dict = {
-        "model": args.model,
-        "fe_set": args.fe_set,
-        "model_path": os.path.abspath(os.path.join(save_dir, model_filename)),
-        "test_data" : args.test_data
-    }
+    wandb_config = ['model','loss','val_data','max_seq_len', 'lr', 'drop_out', 'hidden_dim', 'n_layers', 'batch_size', 'optimizer', 'train_data','test_data', 'n_epochs', 'n_layers', 'n_heads' ]
+    config_dict = {k:v for k, v in vars(args).items() if k in wandb_config}
 
     with open(save_dir+'/model_config.json', 'w') as f:
         json.dump(config_dict, f, indent=4)

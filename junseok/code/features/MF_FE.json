@@ -1,0 +1,21 @@
+{
+    "description": "for matrix factorization",
+    "train_data": "cv_train_FE_MF5.pkl",
+    "val_data": "cv_valid_FE_MF5.pkl",
+    "test_data": "cv_test_FE_MF5.pkl",
+    "features": {
+      "KnowledgeTag": {
+        "type": "cate"
+      },      
+      "grade": {
+        "type": "cate"
+      },
+      "problem_number": {
+        "type": "cate"
+      },      
+      "retest": {
+        "type": "cate"
+      }
+    }
+  }
+  

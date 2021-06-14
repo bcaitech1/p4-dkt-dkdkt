@@ -30,7 +30,7 @@ class Preprocess:
     def get_valid_data(self):
         return self.valid_data
 
-    def split_data(self, data, ratio=0.7, shuffle=True, seed=0):
+    def split_data(self, data, ratio=0.8, shuffle=True, seed=0):
         """
         split data into two parts with a given ratio.
         """
@@ -62,7 +62,7 @@ class Preprocess:
                 label_path = os.path.join(
                     self.args.asset_dir, col+'_classes.npy')
                 le.classes_ = np.load(label_path)
-
+                
                 df[col] = df[col].apply(
                     lambda x: x if x in le.classes_ else 'unknown')
 
@@ -71,7 +71,8 @@ class Preprocess:
             test = le.transform(df[col])
             df[col] = test
 
-        if df['Timestamp'].dtype == object or df['Timestamp'].dtype == "datetime64[ns]":
+        if df['Timestamp'].dtype == object:
+            print(df['Timestamp'].dtype, df['Timestamp'].head(1))
             print("Processing Timestamp...")
             df['Timestamp'] = df['Timestamp'].apply(convert_time)
             print("Processing Timestamp done")
@@ -110,11 +111,7 @@ class Preprocess:
         return df
 
     def load_data_from_file(self, file_name, mode="train"):
-        csv_file_path = os.path.join(self.args.data_dir, file_name)
-        df = pd.read_csv(csv_file_path)
-        if "Unnamed: 0" in df.columns:
-            df = df.drop(columns=['Unnamed: 0'])
-            print("drop Unnamed: 0 column")
+        df = self.load_data_from_csv(file_name)
         df = self.__feature_engineering(df, mode)
         df = self.__preprocessing(df, mode)
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
@@ -145,6 +142,17 @@ class Preprocess:
     def load_valid_data(self, file_name):
         self.valid_data = self.load_data_from_file(file_name, mode="val")
 
+    def load_data_from_csv(self, file_name):
+        csv_file_path = os.path.join(self.args.data_dir, file_name)
+        if '.pkl' in file_name:
+            print("loading file from pkl")
+            df = pd.read_pickle(csv_file_path)
+        else:
+            df = pd.read_csv(csv_file_path)
+        if "Unnamed: 0" in df.columns:
+            df = df.drop(columns=['Unnamed: 0'])
+            print("drop Unnamed: 0 column")
+        return df
 
 def set_column(r):
     new_df = []

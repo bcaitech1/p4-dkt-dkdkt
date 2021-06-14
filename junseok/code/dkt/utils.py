@@ -10,7 +10,7 @@ from pathlib import Path
 import time
 from datetime import datetime
 import pandas as pd
-
+from sklearn.preprocessing import OrdinalEncoder, LabelEncoder
 
 def setSeeds(seed=42):
     # 랜덤 시드를 설정하여 매 코드를 실행할 때마다 동일한 결과를 얻게 합니다.
@@ -26,6 +26,42 @@ def convert_time(s):
     timestamp = time.mktime(datetime.strptime(
         s, '%Y-%m-%d %H:%M:%S').timetuple())
     return int(timestamp)
+
+
+def get_lgbm_dataset(args):  
+    ordinal_feats = ['grade']
+    label_feats = ['assessmentItemID', 'problem_number','hour','dow','solved_disorder','KnowledgeTag','testId','retest']
+    datas = []
+    for file_name in [args.train_data, args.val_data, args.test_data]:
+        csv_file_path = os.path.join(args.data_dir, file_name)
+        if '.pkl' in file_name:
+            print("loading file from pkl")
+            df = pd.read_pickle(csv_file_path)
+        else:
+            df = pd.read_csv(csv_file_path)
+        if "Unnamed: 0" in df.columns:
+            df = df.drop(columns=['Unnamed: 0'])
+            print("drop Unnamed: 0 column")
+        datas.append(df)
+        
+    for col in datas[0].columns:
+            if col in label_feats:
+                for idx, data in enumerate(datas):
+                    X = data[col].values.reshape(-1,1)
+                    if idx == 0:
+                        enc = LabelEncoder()
+                        enc.fit(X)  
+                    X = enc.transform(X)
+                    data[col] = X
+            elif col in ordinal_feats:                
+                for idx, data in enumerate(datas):
+                    X = data[col].values.reshape(-1,1)
+                    if idx == 0:
+                        enc = OrdinalEncoder()
+                        enc.fit(X)
+                    X = enc.transform(X)
+                    data[col] = X
+    return datas
 
 
 def get_latest_created_file(data_dir="./config/train/", file_type="json") -> str:
@@ -227,6 +263,11 @@ def preprocess_arg(args: argparse.Namespace):
         args = import_data_from_json(args.json, 'argparse')
     args_list = []
     for args in batch_json_processing(args):
+        if hasattr(args, 'datasets'):
+            args.train_data = args.datasets['train']            
+            args.val_data = args.datasets['valid']         
+            args.test_data = args.datasets['test']
+
         # Change device based on server system.
         if torch.cuda.is_available() and (args.device == "gpu" or args.device == "cuda"):
             device = "cuda"

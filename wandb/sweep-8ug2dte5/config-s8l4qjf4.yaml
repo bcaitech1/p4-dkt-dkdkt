@@ -1,0 +1,4 @@
+wandb_version: 1
+
+n_epochs:
+  value: 30 --batch_size 32 --model lstm --lr 5e-5
