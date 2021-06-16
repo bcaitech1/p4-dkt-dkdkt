@@ -163,7 +163,7 @@ def import_data_from_json(json_file: str, return_type="json"):
 
 
 def duplicate_name_changer(target_dir, fname):
-    # Prevent duplicate file name by adding suffix '_{n}'.
+    # Prevent duplicate folder name by adding suffix '_{n}'.
     idx = 1
     while os.path.exists(target_dir+fname):
         fname_sep = fname.split('.')
@@ -263,7 +263,7 @@ def preprocess_arg(args: argparse.Namespace):
         args = import_data_from_json(args.json, 'argparse')
     args_list = []
     for args in batch_json_processing(args):
-        if hasattr(args, 'datasets'):
+        if hasattr(args, 'datasets') and args.datasets != None:
             args.train_data = args.datasets['train']            
             args.val_data = args.datasets['valid']         
             args.test_data = args.datasets['test']

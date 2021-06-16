@@ -11,13 +11,13 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 import pickle
 import wandb
-from dkt.utils import duplicate_name_changer
 import re
 try:
     from transformers.modeling_bert import BertConfig, BertEncoder, BertModel
 except:
     from transformers.models.bert.modeling_bert import BertConfig, BertEncoder, BertModel
 import matplotlib.pyplot as plt
+from dkt.utils import duplicate_name_changer
 
 
 class LSTM(nn.Module):
@@ -35,7 +35,6 @@ class LSTM(nn.Module):
         divider = (bool(cate_col_num) + bool(cont_col_num))
         if divider == 0:
             raise RuntimeError("no feature found.")
-
         self.embedding_interaction = nn.Embedding(
             3, self.hidden_dim//3)
         # Embedding
@@ -65,7 +64,7 @@ class LSTM(nn.Module):
                 )
             )
         self.comb_proj = nn.Sequential(
-            nn.Dropout(self.args.drop_out),
+            nn.ReLU(),
             nn.Linear(self.args.hidden_dim *
                       divider, self.args.hidden_dim),
             nn.LayerNorm(self.args.hidden_dim))
@@ -121,8 +120,10 @@ class LSTM(nn.Module):
             for cont_col in self.args.cont_cols:
                 cont_col_list.append(input['cont'][cont_col].unsqueeze(2))
             cont_all = torch.cat(cont_col_list, 2)
+            cont = self.bn_cont(
+                cont_all.view(-1, cont_all.size(-1))).view(batch_size, -1, cont_all.size(-1))
 
-            feature_linear.append(self.embedding_cont(cont_all))
+            feature_linear.append(self.embedding_cont(cont))
 
         X = self.comb_proj(torch.cat(feature_linear, 2))
 
@@ -473,9 +474,9 @@ class LGBM:
     def __init__(self, args):
         self.args = args
 
-    def train(self, train, valid, test):
+    def train(self, train, valid, test, args):
         result = {"epoch": 0, "train_loss": 0, "train_auc": 0, "train_acc": 0,
-                  "valid_auc": 0, "valid_acc": 0}
+                  "valid_auc": 0.7, "valid_acc": 0.7}
         wandb.log(result)
         # X, y 값 분리
         y_train = train['answerCode'].values.ravel()
@@ -485,16 +486,59 @@ class LGBM:
         valid = valid.drop(['answerCode'], axis=1)
         lgb_train = lgb.Dataset(train[train.columns], y_train)
         lgb_valid = lgb.Dataset(valid[valid.columns], y_valid)
-
+        os.makedirs(os.path.join('./models/', args.model_alias), exist_ok=True)
+        folder= os.path.join('./models/', args.model_alias)
+        output = os.path.join(folder, "model.txt")
+        
+        args.seed = 74
+        args.extra_trees = False
+        args.lr = 0.041015616417097805
+        args.xgb_dart = True
+        args.num_leaves = 62
+        args.drop_out = 0.05177613641421279
+        param =  {
+                'tree_learner': args.tl,
+                'seed': args.seed,
+                'drop_seed': args.seed,
+                'objective': 'binary',
+                'metric': 'auc',
+                'boosting': args.boosting,
+                'num_threads': args.num_workers,
+                'extra_trees': args.extra_trees,
+                'drop_rate': args.drop_out,
+                'xgboost_dart_mode': args.xgb_dart,
+                'output_model': output,
+                'learning_rate': args.lr,
+                'device_type': "cpu",
+                # 'max_bin': args.max_bin,
+                'num_leaves': args.num_leaves
+            }
+        print(param)
         model = lgb.train(
-            {'objective': 'binary', 'metric': 'auc', 'boosting': 'dart'},
+            {
+                'tree_learner': args.tl,
+                'seed': args.seed,
+                'drop_seed': args.seed,
+                'objective': 'binary',
+                'metric': 'auc',
+                'boosting': args.boosting,
+                'num_threads': args.num_workers,
+                # 'extra_trees': args.extra_trees,
+                'drop_rate': args.drop_out,
+                'xgboost_dart_mode': args.xgb_dart,
+                'output_model': output,
+                'learning_rate': args.lr,
+                'device_type': "cpu",
+                # 'max_bin': args.max_bin,
+                'num_leaves': args.num_leaves
+            },
             lgb_train,
             valid_sets=[lgb_train, lgb_valid],
-            verbose_eval=100,
-            num_boost_round=1000,
-            early_stopping_rounds=200
+            verbose_eval=10,
+            num_boost_round=20,
+            early_stopping_rounds=200,
         )
-
+        model.save_model(output)
         preds = model.predict(valid[valid.columns])
         acc = accuracy_score(y_valid, np.where(preds >= 0.5, 1, 0))
         auc = roc_auc_score(y_valid, preds)
@@ -503,29 +547,30 @@ class LGBM:
                   "valid_auc": auc, "valid_acc": acc}
         wandb.log(result)
 
-        ax = lgb.plot_importance(model)
-        fig = ax.figure
-        fig.set_size_inches(30, 40)
-        plt.savefig(f'./output/f{self.args.model}{self.args.save_suffix}.png')
-
-        # # LEAVE LAST INTERACTION ONLY
+        # ax = lgb.plot_importance(model)
+        # fig = ax.figure
+        # fig.set_size_inches(30, 40)
+        # output_name = duplicate_name_changer(
+        #     f'./output/', f'{self.args.model}{self.args.save_suffix}')
+        # os.makedirs(os.path.join('./output/', output_name), exist_ok=True)
+        # plt.savefig(os.path.join(os.path.join(
+        #     './output/', output_name), 'impor.png'))
+        # LEAVE LAST INTERACTION ONLY
         # test = test[test['userID'] != test['userID'].shift(-1)]
         # # DROP ANSWERCODE
         # test = test.drop(['answerCode'], axis=1)
 
-        # total_preds = model.predict(test[test.columns])
-        # # SAVE OUTPUT
-        # output_name = duplicate_name_changer(
-        # self.args.output_dir, f"{self.args.model}{self.args.save_suffix}.csv")
-        # write_path = os.path.join(self.args.output_dir, output_name)
-        # os.makedirs(self.args.output_dir, exist_ok=True)
-        # with open(write_path, 'w', encoding='utf8') as w:
-        #     print("writing prediction : {}".format(write_path))
-        #     w.write("id,prediction\n")
-        #     for id, p in enumerate(total_preds):
-        #         w.write('{},{}\n'.format(id,p))
-
-# args.Tfixup 설정해줘야함
+        total_preds = model.predict(test[test.columns])
+        # SAVE OUTPUT
+        output_name = duplicate_name_changer(
+        self.args.output_dir, f"final.csv")
+        write_path = os.path.join(os.path.join('./output/', args.model_alias), output_name)
+        os.makedirs(self.args.output_dir, exist_ok=True)
+        with open('./final.csv', 'w', encoding='utf8') as w:
+            print("writing prediction : {}".format(write_path))
+            w.write("id,prediction\n")
+            for id, p in enumerate(total_preds):
+                w.write('{},{}\n'.format(id,p))
 
 
 class TfixupSaint(nn.Module):
@@ -556,25 +601,31 @@ class TfixupSaint(nn.Module):
         self.enc_comb_proj = nn.Linear(
             (self.hidden_dim // 3) * cate_col_num, self.hidden_dim)
 
-
-
         # Embedding
         # interaction은 현재 correct으로 구성되어있다. correct(1, 2) + padding(0)
         self.embedding_interaction = nn.Embedding(3, self.hidden_dim // 3)
 
-        self.cate_proj = nn.Sequential(
-            nn.Linear((self.hidden_dim//3)*1,
-                      self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim)
-        )
+        if "tfixup" in self.args.model.lower():
+            self.cate_proj = nn.Linear((self.hidden_dim//3)*1,
+                                       self.hidden_dim)
+        else:
+            self.cate_proj = nn.Sequential(
+                nn.Linear((self.hidden_dim//3)*1,
+                          self.hidden_dim),
+                nn.LayerNorm(self.hidden_dim)
+            )
 
         # Decoder embed
 
         if self.args.cont_cols:
             self.cont_bn = nn.BatchNorm1d(cont_col_num)
-            self.cont_proj = nn.Sequential(
-                nn.Linear(cont_col_num, self.hidden_dim),
-                nn.LayerNorm(self.hidden_dim))
+            if "tfixup" in self.args.model.lower():
+                self.cont_proj = nn.Linear(cont_col_num, self.hidden_dim)
+            else:
+                self.cont_proj = nn.Sequential(
+                    nn.Linear(cont_col_num, self.hidden_dim),
+                    nn.LayerNorm(self.hidden_dim)
+                )
 
         self.comb_proj = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
 
@@ -604,7 +655,7 @@ class TfixupSaint(nn.Module):
 
         # T-Fixup
         if "tfixup" in self.args.model.lower():
-
+            print("#######tfixup start!######")
             # 초기화 (Initialization)
             self.tfixup_initialization()
             print("T-Fixupbb Initialization Done")

@@ -24,7 +24,7 @@ def parse_args(mode='train'):
     parser.add_argument('--val_data', nargs='?', const='cv_valid_data_FE_MF5.pkl', type=str, help='validation file name')
     parser.add_argument('--test_data', default='cv_test_data_FE_MF5.pkl', type=str, help='test file name')
 
-    parser.add_argument('--datasets', nargs='?', const='{"train":"cv_train_data_FE_MF5.pkl", "valid":"cv_valid_data_FE_MF5.pkl","test":"cv_test_data_FE_MF5.pkl"}', type=json.loads, help='dataset set')
+    parser.add_argument('--datasets', nargs='?', const='{"train":"cv_train_FE.pkl", "valid":"cv_valid_FE.pkl","test":"test_FE.pkl"}', type=json.loads, help='dataset set')
 
     parser.add_argument('--model_dir', default='models/', type=str, help='model directory(default: models/)')
     parser.add_argument('--model_alias', default='', type=str, help='model output folder name(default: {your model name}/)')    
@@ -41,24 +41,37 @@ def parse_args(mode='train'):
     parser.add_argument('--hidden_dim', default=128, type=int, help='hidden dimension size')
     parser.add_argument('--n_layers', default=4, type=int, help='number of layers')
     parser.add_argument('--n_heads', default=4, type=int, help='number of heads')
-    parser.add_argument('--drop_out', default=0.27, type=float, help='drop out rate')
+    parser.add_argument('--drop_out', default=0.1, type=float, help='drop out rate')
     
     # 훈련
-    parser.add_argument('--n_epochs', default=30, type=int, help='number of epochs')
+    parser.add_argument('--n_epochs', default=3, type=int, help='number of epochs')
     parser.add_argument('--batch_size', default=64, type=int, help='batch size')
-    parser.add_argument('--lr', default=0.00007, type=float, help='learning rate')
+    parser.add_argument('--lr', default=0.05, type=float, help='learning rate')
     parser.add_argument('--clip_grad', default=100, type=int, help='clip grad')
-    parser.add_argument('--patience', default=10, type=int, help='for early stopping')
+    parser.add_argument('--patience', default=5, type=int, help='for early stopping')
     
     parser.add_argument('--log_steps', default=50, type=int, help='print log per n steps')
     
     ### 중요 ###
-    parser.add_argument('--model', default='lstmattn', type=str, help='model type')
+    parser.add_argument('--model', default='lgbm', type=str, help='model type')
     parser.add_argument('--optimizer', default='adamW', type=str, help='optimizer type')
-    parser.add_argument('--scheduler', default='plateau', type=str, help='scheduler type')
+    parser.add_argument('--scheduler', default='linear_warmup', type=str, help='scheduler type')
     parser.add_argument('--loss', default='bce', type=str, help='loss type')
     parser.add_argument('--delta', default=2, type=float, help='loss gamma delta')
+    parser.add_argument('--stride', default=10, type=int, help='stride for augmentation (default: 10)') 
+    parser.add_argument('--shuffle', nargs='?', const=True, type=bool, help='shuffle for augmentation (default: True)')
+    parser.add_argument('--shuffle_n', default=3, type=int, help='for apply cv strategy for train/valid split (default: 3)')
+    parser.add_argument('--window', nargs='?', const=True, type=bool, help='augmentation for training (default: False)')
     
+    # LGBM
+    parser.add_argument('--boosting', default="dart", type=str, help='grad boosting')
+    parser.add_argument('--extra_trees', default=False, type=bool, help='stride for augmentation (default: 10)') 
+    parser.add_argument('--xgb_dart', default=False, type=bool, help='for apply cv strategy for train/valid split (default: 3)')
+    parser.add_argument('--tl',default='serial',type=str, help='augmentation for training (default: False)')
+    parser.add_argument('--num_leaves',default=31,type=int, help='augmentation for training (default: False)')
+    parser.add_argument('--max_bin',default=255,type=int, help='augmentation for training (default: False)')
+    
+
     args = parser.parse_args()
 
     return args

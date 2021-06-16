@@ -147,11 +147,13 @@ class Preprocess:
         if '.pkl' in file_name:
             print("loading file from pkl")
             df = pd.read_pickle(csv_file_path)
+            print(f"data length : {file_name}", len(df))
         else:
             df = pd.read_csv(csv_file_path)
         if "Unnamed: 0" in df.columns:
             df = df.drop(columns=['Unnamed: 0'])
             print("drop Unnamed: 0 column")
+        df = df.fillna(0)
         return df
 
 def set_column(r):

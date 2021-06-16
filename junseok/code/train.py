@@ -2,7 +2,8 @@ import os
 from args import parse_args
 from dkt.dataloader import Preprocess
 from dkt import trainer
-from dkt.utils import setSeeds, preprocess_arg, get_lgbm_dataset
+from dkt.utils import setSeeds, preprocess_arg, get_lgbm_dataset, duplicate_name_changer
+import re
 from dkt.model import LGBM
 import wandb
 
@@ -10,19 +11,24 @@ wandb_config = ['model','loss','val_data','max_seq_len', 'lr', 'drop_out', 'hidd
 
 def main(args):
     wandb.login()
+    if args.model == "lgbm":
+        wandb_config = ['model_alias']
+        output_name = duplicate_name_changer(
+            f'./output/', f'{args.model}{args.save_suffix}')
+        args.model_alias = output_name
 
     args_list = preprocess_arg(args)
 
-    wandb.init(project='dkt', config=vars(args), name=str({k:v for k,v in vars(args).items() if k in wandb_config}))
+    wandb.init(project='lgbmsweep', entity='dkdkt', config=vars(args), name=str({k:v for k,v in vars(args).items() if k in wandb_config}))
     for i, args in enumerate(args_list):
         print(f"train args : \n {args}")
         print(f'start {i} json config')
         args.k_fold_idx = 0
         setSeeds(args.seed)
-        if args.model == "lgbm":
+        if args.model == "lgbm":            
             model = LGBM(args)
             train, valid, test = get_lgbm_dataset(args)
-            model.train(train,valid, test)
+            model.train(train,valid, test, args)
             continue
         preprocess = Preprocess(args)
         preprocess.load_train_data(args.train_data)
