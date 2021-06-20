@@ -32,9 +32,9 @@
 ## [Project] Do you know yourself? 
 ### 시연
 - 상식 주제를 골라 문제를 푼다.
- - ![1](https://user-images.githubusercontent.com/46857207/122681837-3a672200-d231-11eb-8e65-63ccb3b6f21d.gif)
+    - ![1](https://user-images.githubusercontent.com/46857207/122681837-3a672200-d231-11eb-8e65-63ccb3b6f21d.gif)
 - 문제를 다 풀면 사용자가 쉬워 할 문제와 어려워 할 문제를 모델이 추론하여 보여준다.
- - ![2](https://user-images.githubusercontent.com/46857207/122681900-7d28fa00-d231-11eb-818a-929569e55312.gif)
+    - ![2](https://user-images.githubusercontent.com/46857207/122681900-7d28fa00-d231-11eb-818a-929569e55312.gif)
 ### 개요
 - 사용자는 4개의 주제, 3가지의 난이도로 이루어진 상식문제 5문제를 푼다.
 - 사용자의 시계열 데이터는 feature engineering을 통해 모델에 넣을 수 있게 가공된다.
