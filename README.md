@@ -12,16 +12,6 @@
 
 <!-- <center><img src="https://i.imgur.com/SmILzOp.png"></center> -->
 
-<center>
-    <div style="transform: translateX(-250%); height: 10%; max-height: 10%; max-width: 10%; width: 10%; display: flex;">
-        <img src="https://s3-ap-northeast-2.amazonaws.com/prod-aistages-public/app/Users/00000180/user_image.png" style="object-fit: cover; border-radius: 50%;">
-        <img src="https://s3-ap-northeast-2.amazonaws.com/prod-aistages-public/app/Users/00000025/user_image.png" style="object-fit: cover; border-radius: 50%;">
-        <img src="https://s3-ap-northeast-2.amazonaws.com/prod-aistages-public/app/Users/00000167/user_image.png" style="object-fit: cover; border-radius: 50%;">
-        <img src="https://s3-ap-northeast-2.amazonaws.com/prod-aistages-public/app/Users/00000128/user_image.png" style="object-fit: cover; border-radius: 50%;">
-        <img src="https://s3-ap-northeast-2.amazonaws.com/prod-aistages-public/app/Users/00000019/user_image.png" style="object-fit: cover; border-radius: 50%;">
-        <img src="https://s3-ap-northeast-2.amazonaws.com/prod-aistages-public/app/Users/00000218/user_image.png" style="object-fit: cover; border-radius: 50%;">
-    </div>
-</center>
 
 
 
