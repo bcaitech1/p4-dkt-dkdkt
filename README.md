@@ -19,7 +19,7 @@
 ![](https://i.imgur.com/YcLejxW.png)
 
 
-## [Project] Do you know yourself? 
+## [Project] Do you know yourself? [링크](https://github.com/RoadVirusHN/do-you-know-yourself)
 ### 시연
 - 상식 주제를 골라 문제를 푼다.
     - ![1](https://user-images.githubusercontent.com/46857207/122681837-3a672200-d231-11eb-8e65-63ccb3b6f21d.gif)
